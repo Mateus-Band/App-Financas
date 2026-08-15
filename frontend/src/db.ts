@@ -1,3 +1,4 @@
+import 'dexie-export-import';
 import Dexie, { type Table } from 'dexie';
 
 export interface Account {

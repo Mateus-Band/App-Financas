@@ -3,7 +3,6 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './db';
 import { useGoogleLogin } from '@react-oauth/google';
 import { initGoogleDriveApi, uploadBackup, restoreFromDrive } from './GoogleSync';
-import download from 'downloadjs';
 import { Trash2, Plus, Download, Upload, Settings as SettingsIcon } from 'lucide-react';
 
 export default function Settings() {

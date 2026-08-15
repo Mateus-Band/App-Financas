@@ -27,7 +27,7 @@ export const setGoogleToken = (accessToken: string) => {
 
 // Find the backup file in appDataFolder
 const findBackupFile = async (): Promise<string | null> => {
-  const response = await gapi.client.drive.files.list({
+  const response = await (gapi.client as any).drive.files.list({
     spaces: 'appDataFolder',
     fields: 'files(id, name)',
     q: `name='${FILE_NAME}'`,

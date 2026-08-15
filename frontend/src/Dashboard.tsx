@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './db';
 import { format, isSameMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Wallet, CreditCard, Users, TrendingUp, TrendingDown, DollarSign, Download } from 'lucide-react';
+import { Wallet, CreditCard, Users, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 
 export default function Dashboard() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
@@ -12,19 +12,6 @@ export default function Dashboard() {
   const transactions = useLiveQuery(() => db.transactions.toArray()) || [];
   const debts = useLiveQuery(() => db.debts.toArray()) || [];
   const fixedEntries = useLiveQuery(() => db.fixedEntries.toArray()) || [];
-
-  const handleExport = async () => {
-    try {
-      const blob = await db.export();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `finance-backup-${new Date().toISOString().slice(0, 10)}.json`;
-      a.click();
-    } catch (error) {
-      console.error("Erro ao exportar", error);
-    }
-  };
 
   const handleMonthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSelectedMonth(e.target.value);
