@@ -1,0 +1,246 @@
+import { useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from './db';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
+import { addMonths, format } from 'date-fns';
+import { uploadBackup } from './GoogleSync';
+
+type EntryType = 'Income' | 'Expense' | 'Debt' | null;
+
+export default function NewEntry() {
+  const navigate = useNavigate();
+  const accounts = useLiveQuery(() => db.accounts.toArray()) || [];
+  
+  const [step, setStep] = useState(1);
+  const [type, setType] = useState<EntryType>(null);
+  
+  // Form State
+  const [category, setCategory] = useState('');
+  const [description, setDescription] = useState('');
+  const [amount, setAmount] = useState('');
+  const [accountId, setAccountId] = useState('');
+  
+  // Expense specific
+  const [paymentMethod, setPaymentMethod] = useState('');
+  const [isInstallment, setIsInstallment] = useState(false);
+  const [installmentCount, setInstallmentCount] = useState('2');
+  
+  // Debt specific
+  const [debtType, setDebtType] = useState('');
+  const [personName, setPersonName] = useState('');
+
+  const handleTypeSelect = (selected: EntryType) => {
+    setType(selected);
+    setStep(2);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!type || !accountId || !amount) return;
+    
+    const numAmount = parseFloat(amount);
+    const date = format(new Date(), 'yyyy-MM-dd'); // Today
+
+    if (type === 'Income') {
+      await db.transactions.add({
+        date,
+        type: 'Income',
+        category,
+        description,
+        amount: numAmount,
+        accountId: parseInt(accountId),
+      });
+    } 
+    else if (type === 'Expense') {
+      if (paymentMethod === 'Crédito' && isInstallment) {
+        const count = parseInt(installmentCount);
+        const installmentAmount = numAmount / count;
+        const groupId = crypto.randomUUID();
+        
+        const installments = Array.from({ length: count }).map((_, i) => ({
+          date: format(addMonths(new Date(), i), 'yyyy-MM-dd'),
+          type: 'Expense' as const,
+          category,
+          description,
+          amount: installmentAmount,
+          accountId: parseInt(accountId),
+          paymentMethod: 'Crédito' as const,
+          isInstallment: true,
+          installmentCount: count,
+          currentInstallment: i + 1,
+          installmentGroupId: groupId
+        }));
+        
+        await db.transactions.bulkAdd(installments);
+      } else {
+        await db.transactions.add({
+          date,
+          type: 'Expense',
+          category,
+          description,
+          amount: numAmount,
+          accountId: parseInt(accountId),
+          paymentMethod: paymentMethod as any,
+        });
+      }
+    }
+    else if (type === 'Debt') {
+      // Also log as a transaction to affect balance if needed? 
+      // Emprestei / Paguei -> Money left account -> Expense-like for balance
+      // Peguei / Recebi -> Money entered account -> Income-like for balance
+      // We will record it as type 'Debt' in transactions so the dashboard can handle the balance logic.
+      // Wait, the dashboard already handles balance via the Debts table.
+      // Let's just store it in Debts table. The dashboard queries `debts` directly!
+      await db.debts.add({
+        personName,
+        type: debtType as any,
+        amount: numAmount,
+        description,
+        date,
+        accountId: parseInt(accountId),
+      });
+    }
+
+    // Auto-sync after saving
+    const token = localStorage.getItem('gdrive_token');
+    if (token) {
+      uploadBackup(token).catch(e => console.error("Auto-sync failed", e));
+    }
+
+    navigate('/'); // Redirect to dashboard
+  };
+
+  return (
+    <div className="mb-20">
+      <div className="flex items-center gap-3 mb-6">
+        {step > 1 && (
+          <button onClick={() => setStep(1)} className="p-2 -ml-2 rounded-full hover:bg-[var(--surface-hover)]">
+            <ArrowLeft size={20} />
+          </button>
+        )}
+        <h1 className="text-2xl font-bold">Novo Lançamento</h1>
+      </div>
+
+      <div className="card">
+        {step === 1 && (
+          <div className="flex flex-col gap-3">
+            <p className="text-secondary mb-2">Selecione o tipo de lançamento:</p>
+            <button onClick={() => handleTypeSelect('Income')} className="btn btn-green w-full text-lg py-4">Receita (Ganho)</button>
+            <button onClick={() => handleTypeSelect('Expense')} className="btn btn-red w-full text-lg py-4">Despesa (Gasto)</button>
+            <button onClick={() => handleTypeSelect('Debt')} className="btn btn-outline w-full text-lg py-4 border-[var(--primary-color)] text-[var(--primary-color)]">Empréstimo / Dívida</button>
+          </div>
+        )}
+
+        {step === 2 && (
+          <form onSubmit={handleSave} className="flex flex-col gap-4">
+            <h2 className="text-lg font-semibold border-b border-[var(--border-color)] pb-2 mb-2">
+              Detalhes: {type === 'Income' ? 'Receita' : type === 'Expense' ? 'Despesa' : 'Dívida'}
+            </h2>
+
+            {type === 'Debt' && (
+              <>
+                <div className="form-group">
+                  <label className="input-label">O que aconteceu?</label>
+                  <select className="input-field" value={debtType} onChange={e => setDebtType(e.target.value)} required>
+                    <option value="">Selecione...</option>
+                    <option value="Lent">Eu emprestei dinheiro</option>
+                    <option value="Borrowed">Eu peguei emprestado</option>
+                    <option value="Received">Recebi de volta</option>
+                    <option value="Paid">Paguei o que devia</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="input-label">Nome da Pessoa</label>
+                  <input type="text" className="input-field" value={personName} onChange={e => setPersonName(e.target.value)} required placeholder="Ex: João" />
+                </div>
+              </>
+            )}
+
+            {(type === 'Income' || type === 'Expense') && (
+              <div className="form-group">
+                <label className="input-label">Categoria</label>
+                <select className="input-field" value={category} onChange={e => setCategory(e.target.value)} required>
+                  <option value="">Selecione...</option>
+                  {type === 'Income' ? (
+                    <>
+                      <option value="Prêmio">Prêmio</option>
+                      <option value="Rendimento">Rendimento</option>
+                      <option value="Presente">Presente</option>
+                      <option value="Outro">Outro</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="Transporte">Transporte</option>
+                      <option value="Alimentação">Alimentação (Refeição)</option>
+                      <option value="Mercado">Mercado</option>
+                      <option value="Lazer">Lazer</option>
+                      <option value="Compras">Compras</option>
+                      <option value="Farmácia">Farmácia</option>
+                      <option value="Outro">Outro</option>
+                    </>
+                  )}
+                </select>
+              </div>
+            )}
+
+            <div className="form-group">
+              <label className="input-label">Descrição</label>
+              <input type="text" className="input-field" value={description} onChange={e => setDescription(e.target.value)} required placeholder="Texto curto" />
+            </div>
+
+            <div className="form-group">
+              <label className="input-label">Valor (R$)</label>
+              <input type="number" step="0.01" min="0.01" className="input-field" value={amount} onChange={e => setAmount(e.target.value)} required placeholder="0,00" />
+            </div>
+
+            <div className="form-group">
+              <label className="input-label">Conta Bancária {type === 'Debt' && '(Sempre via Pix)'}</label>
+              <select className="input-field" value={accountId} onChange={e => setAccountId(e.target.value)} required>
+                <option value="">Selecione...</option>
+                {accounts.map(acc => (
+                  <option key={acc.id} value={acc.id}>{acc.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {type === 'Expense' && (
+              <div className="form-group">
+                <label className="input-label">Meio de Pagamento</label>
+                <select className="input-field" value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} required>
+                  <option value="">Selecione...</option>
+                  <option value="Pix">Pix</option>
+                  <option value="Crédito">Crédito</option>
+                  <option value="Débito">Débito</option>
+                  <option value="Dinheiro">Dinheiro</option>
+                </select>
+              </div>
+            )}
+
+            {type === 'Expense' && paymentMethod === 'Crédito' && (
+              <div className="form-group p-3 border border-[var(--border-color)] rounded-lg bg-[var(--bg-color)] mt-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" className="w-4 h-4 accent-[var(--primary-color)]" checked={isInstallment} onChange={e => setIsInstallment(e.target.checked)} />
+                  <span className="text-sm font-medium">É parcelado?</span>
+                </label>
+                
+                {isInstallment && (
+                  <div className="mt-3">
+                    <label className="input-label">Número de Parcelas</label>
+                    <select className="input-field" value={installmentCount} onChange={e => setInstallmentCount(e.target.value)}>
+                      {Array.from({ length: 11 }).map((_, i) => (
+                        <option key={i+2} value={i+2}>{i+2}x</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <button type="submit" className="btn btn-primary w-full mt-4">Salvar Lançamento</button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
