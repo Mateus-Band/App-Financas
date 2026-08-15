@@ -25,11 +25,17 @@ Um aplicativo de gestão financeira pessoal **local-first** focado em privacidad
    ```bash
    npm install
    ```
-3. Inicie o servidor de desenvolvimento:
+3. Configure as variáveis de ambiente:
+   - Copie o arquivo `.env.example` para `.env`
+   - Preencha o seu `VITE_GOOGLE_CLIENT_ID` caso queira testar o login com o Google localmente.
+   ```bash
+   cp .env.example .env
+   ```
+4. Inicie o servidor de desenvolvimento:
    ```bash
    npm run dev
    ```
-4. Acesse em seu navegador: `http://localhost:5173/`
+5. Acesse em seu navegador: `http://localhost:5173/`
 
 ## Tecnologias Utilizadas
 - [React](https://reactjs.org/) + [Vite](https://vitejs.dev/)
