@@ -41,6 +41,7 @@ export default function NewEntry() {
     
     const numAmount = parseFloat(amount);
     const date = format(new Date(), 'yyyy-MM-dd'); // Today
+    const updatedAt = new Date().toISOString();
 
     if (type === 'Income') {
       await db.transactions.add({
@@ -50,6 +51,7 @@ export default function NewEntry() {
         description,
         amount: numAmount,
         accountId: parseInt(accountId),
+        updatedAt
       });
     } 
     else if (type === 'Expense') {
@@ -69,7 +71,8 @@ export default function NewEntry() {
           isInstallment: true,
           installmentCount: count,
           currentInstallment: i + 1,
-          installmentGroupId: groupId
+          installmentGroupId: groupId,
+          updatedAt
         }));
         
         await db.transactions.bulkAdd(installments);
@@ -82,16 +85,11 @@ export default function NewEntry() {
           amount: numAmount,
           accountId: parseInt(accountId),
           paymentMethod: paymentMethod as any,
+          updatedAt
         });
       }
     }
     else if (type === 'Debt') {
-      // Also log as a transaction to affect balance if needed? 
-      // Emprestei / Paguei -> Money left account -> Expense-like for balance
-      // Peguei / Recebi -> Money entered account -> Income-like for balance
-      // We will record it as type 'Debt' in transactions so the dashboard can handle the balance logic.
-      // Wait, the dashboard already handles balance via the Debts table.
-      // Let's just store it in Debts table. The dashboard queries `debts` directly!
       await db.debts.add({
         personName,
         type: debtType as any,
@@ -99,6 +97,7 @@ export default function NewEntry() {
         description,
         date,
         accountId: parseInt(accountId),
+        updatedAt
       });
     }
 

@@ -20,10 +20,11 @@ export async function seedDatabase() {
   const accountCount = await db.accounts.count();
   
   if (accountCount === 0) {
+    const now = new Date().toISOString();
     // Add default accounts
     await db.accounts.bulkAdd([
-      { name: 'Meu Banco', balance: 0 },
-      { name: 'Dinheiro físico', balance: 0 }
+      { name: 'Meu Banco', balance: 0, updatedAt: now },
+      { name: 'Dinheiro físico', balance: 0, updatedAt: now }
     ]);
     
     // Nenhuma despesa ou receita fixa por padrão. 

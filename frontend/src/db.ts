@@ -5,6 +5,7 @@ export interface Account {
   id?: number;
   name: string;
   balance: number;
+  updatedAt?: string;
 }
 
 export interface Transaction {
@@ -21,6 +22,7 @@ export interface Transaction {
   currentInstallment?: number;
   installmentGroupId?: string;
   personName?: string; // For debts
+  updatedAt?: string;
 }
 
 export interface Debt {
@@ -31,6 +33,7 @@ export interface Debt {
   description: string;
   date: string;
   accountId: number;
+  updatedAt?: string;
 }
 
 export interface FixedEntry {
@@ -40,6 +43,8 @@ export interface FixedEntry {
   amount: number;
   day: number;
   accountId: number;
+  startDate?: string;
+  updatedAt?: string;
 }
 
 export class FinanceDatabase extends Dexie {
@@ -55,6 +60,30 @@ export class FinanceDatabase extends Dexie {
       transactions: '++id, date, type, accountId, paymentMethod, installmentGroupId',
       debts: '++id, personName, type, date',
       fixedEntries: '++id, type, day'
+    });
+    
+    this.version(2).stores({
+      accounts: '++id, name',
+      transactions: '++id, date, type, accountId, paymentMethod, installmentGroupId',
+      debts: '++id, personName, type, date',
+      fixedEntries: '++id, type, day'
+    }).upgrade(tx => {
+      const now = new Date().toISOString();
+      return Promise.all([
+        tx.table('accounts').toCollection().modify(account => {
+          account.updatedAt = now;
+        }),
+        tx.table('transactions').toCollection().modify(transaction => {
+          transaction.updatedAt = now;
+        }),
+        tx.table('debts').toCollection().modify(debt => {
+          debt.updatedAt = now;
+        }),
+        tx.table('fixedEntries').toCollection().modify(entry => {
+          entry.updatedAt = now;
+          entry.startDate = '2000-01-01'; // Padrão antigo para não sumir
+        })
+      ]);
     });
   }
 }

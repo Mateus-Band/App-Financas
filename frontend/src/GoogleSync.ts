@@ -107,13 +107,68 @@ export const downloadBackup = async (accessToken: string): Promise<Blob | null> 
   }
 };
 
-// Import backup from drive to Dexie
-export const restoreFromDrive = async (accessToken: string) => {
+// Merge backup from drive to Dexie
+export const syncWithDrive = async (accessToken: string) => {
   const blob = await downloadBackup(accessToken);
   if (!blob) {
-    throw new Error('Nenhum backup encontrado no Google Drive.');
+    // If there is no backup in Drive, just upload local to Drive
+    await uploadBackup(accessToken);
+    return;
   }
-  await db.delete();
-  await db.open();
-  await db.import(blob);
+
+  const text = await blob.text();
+  const json = JSON.parse(text);
+  
+  // Extract remote tables
+  const remoteTables: Record<string, any[]> = {};
+  if (json && json.data && Array.isArray(json.data.data)) {
+    for (const tableData of json.data.data) {
+      if (tableData.tableName && tableData.rows) {
+        remoteTables[tableData.tableName] = tableData.rows;
+      }
+    }
+  }
+
+  const tableNames = ['accounts', 'transactions', 'debts', 'fixedEntries'];
+
+  await db.transaction('rw', db.accounts, db.transactions, db.debts, db.fixedEntries, async () => {
+    for (const tableName of tableNames) {
+      const table = (db as any)[tableName];
+      if (!table) continue;
+
+      const localRows = await table.toArray();
+      const remoteRows = remoteTables[tableName] || [];
+
+      const mergedMap = new Map<number, any>();
+
+      // Put remote rows first
+      for (const row of remoteRows) {
+        if (row.id) mergedMap.set(row.id, row);
+      }
+
+      // Overwrite with local rows if they are newer or don't exist remotely
+      for (const localRow of localRows) {
+        if (!localRow.id) continue;
+        const remoteRow = mergedMap.get(localRow.id);
+
+        if (!remoteRow) {
+          mergedMap.set(localRow.id, localRow);
+        } else {
+          // Compare updatedAt
+          const localDate = localRow.updatedAt ? new Date(localRow.updatedAt).getTime() : 0;
+          const remoteDate = remoteRow.updatedAt ? new Date(remoteRow.updatedAt).getTime() : 0;
+          
+          if (localDate >= remoteDate) {
+            mergedMap.set(localRow.id, localRow);
+          }
+        }
+      }
+
+      // Bulk put merged rows
+      await table.bulkPut(Array.from(mergedMap.values()));
+    }
+  });
+
+  // After merging locally, upload the new merged state to Drive
+  await uploadBackup(accessToken);
 };

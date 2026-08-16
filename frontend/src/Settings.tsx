@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './db';
 import { useGoogleLogin } from '@react-oauth/google';
-import { initGoogleDriveApi, uploadBackup, restoreFromDrive } from './GoogleSync';
+import { initGoogleDriveApi, uploadBackup, syncWithDrive } from './GoogleSync';
 import { Trash2, Plus, Download, Upload, Settings as SettingsIcon } from 'lucide-react';
 
 export default function Settings() {
@@ -38,7 +38,7 @@ export default function Settings() {
       setGoogleToken(token);
       setSyncStatus('Buscando backup na nuvem...');
       try {
-        await restoreFromDrive(token);
+        await syncWithDrive(token);
         setSyncStatus('Restaurado com sucesso!');
         setTimeout(() => window.location.reload(), 1500);
       } catch (err) {
@@ -113,7 +113,11 @@ export default function Settings() {
   const handleAddAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newAccountName.trim()) return;
-    await db.accounts.add({ name: newAccountName.trim(), balance: 0 });
+    await db.accounts.add({ 
+      name: newAccountName.trim(), 
+      balance: 0,
+      updatedAt: new Date().toISOString()
+    });
     setNewAccountName('');
     triggerAutoSync();
   };
@@ -121,7 +125,10 @@ export default function Settings() {
   const handleUpdateBalance = async (id: number, newBalanceStr: string) => {
     const newBalance = parseFloat(newBalanceStr);
     if (isNaN(newBalance)) return;
-    await db.accounts.update(id, { balance: newBalance });
+    await db.accounts.update(id, { 
+      balance: newBalance,
+      updatedAt: new Date().toISOString()
+    });
     triggerAutoSync();
   };
 
@@ -145,7 +152,9 @@ export default function Settings() {
       name: fixedName,
       amount: parseFloat(fixedAmount),
       day: parseInt(fixedDay),
-      accountId: parseInt(fixedAccountId)
+      accountId: parseInt(fixedAccountId),
+      startDate: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     });
     setFixedName('');
     setFixedAmount('');
