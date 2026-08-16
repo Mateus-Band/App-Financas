@@ -5,12 +5,13 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { addMonths, format } from 'date-fns';
 import { uploadBackup } from './GoogleSync';
+import Loader from './components/Loader';
 
 type EntryType = 'Income' | 'Expense' | 'Debt' | null;
 
 export default function NewEntry() {
   const navigate = useNavigate();
-  const accounts = useLiveQuery(() => db.accounts.toArray()) || [];
+  const accounts = useLiveQuery(() => db.accounts.toArray());
   
   const [step, setStep] = useState(1);
   const [type, setType] = useState<EntryType>(null);
@@ -34,6 +35,10 @@ export default function NewEntry() {
     setType(selected);
     setStep(2);
   };
+
+  if (accounts === undefined) {
+    return <Loader />;
+  }
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();

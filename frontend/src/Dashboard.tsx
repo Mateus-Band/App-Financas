@@ -5,18 +5,23 @@ import { format, isSameMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Wallet, CreditCard, Users, TrendingUp, TrendingDown, DollarSign, CalendarDays } from 'lucide-react';
 import { calculateAccountBalance, calculatePeopleDebts, calculateMonthSummary, calculateProjections } from './finance-calculations';
+import Loader from './components/Loader';
 
 export default function Dashboard() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
 
-  const accounts = useLiveQuery(() => db.accounts.toArray()) || [];
-  const transactions = useLiveQuery(() => db.transactions.toArray()) || [];
-  const debts = useLiveQuery(() => db.debts.toArray()) || [];
-  const fixedEntries = useLiveQuery(() => db.fixedEntries.toArray()) || [];
+  const accounts = useLiveQuery(() => db.accounts.toArray());
+  const transactions = useLiveQuery(() => db.transactions.toArray());
+  const debts = useLiveQuery(() => db.debts.toArray());
+  const fixedEntries = useLiveQuery(() => db.fixedEntries.toArray());
 
   const handleMonthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSelectedMonth(e.target.value);
   };
+
+  if (accounts === undefined || transactions === undefined || debts === undefined || fixedEntries === undefined) {
+    return <Loader />;
+  }
 
   const accountBalances = accounts.map(acc => {
     const computedBalance = calculateAccountBalance(acc, transactions, debts, fixedEntries);

@@ -4,10 +4,12 @@ import { db } from './db';
 import { useGoogleLogin } from '@react-oauth/google';
 import { initGoogleDriveApi, uploadBackup, syncWithDrive } from './GoogleSync';
 import { Trash2, Plus, Download, Upload, Settings as SettingsIcon } from 'lucide-react';
+import Loader from './components/Loader';
+import Toast from './components/Toast';
 
 export default function Settings() {
-  const accounts = useLiveQuery(() => db.accounts.toArray()) || [];
-  const fixedEntries = useLiveQuery(() => db.fixedEntries.toArray()) || [];
+  const accounts = useLiveQuery(() => db.accounts.toArray());
+  const fixedEntries = useLiveQuery(() => db.fixedEntries.toArray());
   
   // -- Sync State --
   const [googleToken, setGoogleToken] = useState<string | null>(localStorage.getItem('gdrive_token'));
@@ -23,11 +25,23 @@ export default function Settings() {
   const [fixedDay, setFixedDay] = useState('');
   const [fixedAccountId, setFixedAccountId] = useState('');
 
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [toastType, setToastType] = useState<'success' | 'error'>('success');
+
+  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+    setToastMsg(msg);
+    setToastType(type);
+  };
+
   useEffect(() => {
     initGoogleDriveApi().then(() => {
       console.log('GAPI inicializado');
     }).catch(e => console.error(e));
   }, []);
+
+  if (accounts === undefined || fixedEntries === undefined) {
+    return <Loader />;
+  }
 
   // --- GOOGLE SYNC LOGIC ---
   const login = useGoogleLogin({
@@ -134,7 +148,7 @@ export default function Settings() {
 
   const handleDeleteAccount = async (id: number, name: string) => {
     if (name === 'Dinheiro físico') {
-      alert('A conta "Dinheiro físico" não pode ser apagada.');
+      showToast('A conta "Dinheiro físico" não pode ser apagada.', 'error');
       return;
     }
     if (confirm(`Tem certeza que deseja apagar a conta ${name}?`)) {
@@ -298,6 +312,8 @@ export default function Settings() {
           </button>
         </div>
       </section>
+
+      {toastMsg && <Toast message={toastMsg} type={toastType} onClose={() => setToastMsg(null)} />}
     </div>
   );
 }
