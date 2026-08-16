@@ -3,7 +3,8 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './db';
 import { format, isSameMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Wallet, CreditCard, Users, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
+import { Wallet, CreditCard, Users, TrendingUp, TrendingDown, DollarSign, CalendarDays } from 'lucide-react';
+import { calculateAccountBalance, calculatePeopleDebts, calculateMonthSummary, calculateProjections } from './finance-calculations';
 
 export default function Dashboard() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
@@ -18,22 +19,7 @@ export default function Dashboard() {
   };
 
   const accountBalances = accounts.map(acc => {
-    const accTxs = transactions.filter(t => t.accountId === acc.id);
-    const incomes = accTxs.filter(t => t.type === 'Income').reduce((sum, t) => sum + t.amount, 0);
-    const expenses = accTxs.filter(t => t.type === 'Expense' && t.paymentMethod !== 'Crédito').reduce((sum, t) => sum + t.amount, 0);
-
-    const accDebts = debts.filter(d => d.accountId === acc.id);
-    const lent = accDebts.filter(d => d.type === 'Lent').reduce((sum, d) => sum + d.amount, 0);
-    const borrowed = accDebts.filter(d => d.type === 'Borrowed').reduce((sum, d) => sum + d.amount, 0);
-    const received = accDebts.filter(d => d.type === 'Received').reduce((sum, d) => sum + d.amount, 0);
-    const paid = accDebts.filter(d => d.type === 'Paid').reduce((sum, d) => sum + d.amount, 0);
-
-    const debtNet = borrowed + received - lent - paid;
-    const fixedInc = fixedEntries.filter(f => f.accountId === acc.id && f.type === 'Income').reduce((sum, f) => sum + f.amount, 0);
-    const fixedExp = fixedEntries.filter(f => f.accountId === acc.id && f.type === 'Expense').reduce((sum, f) => sum + f.amount, 0);
-
-    const computedBalance = acc.balance + incomes + fixedInc - expenses - fixedExp + debtNet;
-
+    const computedBalance = calculateAccountBalance(acc, transactions, debts, fixedEntries);
     return { ...acc, computedBalance };
   });
 
@@ -51,24 +37,12 @@ export default function Dashboard() {
     return acc;
   }, {} as Record<string, number>);
 
-  const peopleDebts = debts.reduce((acc, debt) => {
-    if (!acc[debt.personName]) acc[debt.personName] = 0;
-    if (debt.type === 'Lent' || debt.type === 'Paid') acc[debt.personName] += debt.amount;
-    if (debt.type === 'Borrowed' || debt.type === 'Received') acc[debt.personName] -= debt.amount;
-    return acc;
-  }, {} as Record<string, number>);
-
+  const peopleDebts = calculatePeopleDebts(debts);
   const debtSummaries = Object.entries(peopleDebts).filter(([_, amount]) => amount !== 0);
 
-  const currentMonthTxs = transactions.filter(t => isSameMonth(new Date(t.date), selectedMonthDate));
-  const monthVarIncomes = currentMonthTxs.filter(t => t.type === 'Income').reduce((sum, t) => sum + t.amount, 0);
-  const monthVarExpenses = currentMonthTxs.filter(t => t.type === 'Expense').reduce((sum, t) => sum + t.amount, 0);
-  const monthFixedIncomes = fixedEntries.filter(f => f.type === 'Income').reduce((sum, f) => sum + f.amount, 0);
-  const monthFixedExpenses = fixedEntries.filter(f => f.type === 'Expense').reduce((sum, f) => sum + f.amount, 0);
+  const { totalMonthIncome, totalMonthExpense, netMonth } = calculateMonthSummary(selectedMonthDate, transactions, fixedEntries);
 
-  const totalMonthIncome = monthVarIncomes + monthFixedIncomes;
-  const totalMonthExpense = monthVarExpenses + monthFixedExpenses;
-  const netMonth = totalMonthIncome - totalMonthExpense;
+  const projections = calculateProjections(totalBalance, selectedMonthDate, transactions, fixedEntries, 6);
 
   const formatBRL = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
@@ -178,6 +152,28 @@ export default function Dashboard() {
             ))}
           </div>
         )}
+      </section>
+
+      <section className="card mb-8">
+        <h2 className="text-lg font-bold mb-4 flex items-center gap-2 border-b border-[var(--border-color)] pb-2">
+          <CalendarDays size={18} /> Projeção de Saldo (Próximos 6 meses)
+        </h2>
+        <div className="flex flex-col gap-3">
+          {projections.map((proj, idx) => (
+            <div key={idx} className="flex justify-between items-center pb-2 border-b border-[var(--border-color)] last:border-0 last:pb-0">
+              <div>
+                <p className="font-semibold text-sm capitalize">{format(proj.date, 'MMMM yyyy', { locale: ptBR })}</p>
+                <div className="flex gap-3 mt-1">
+                  <span className="text-xs text-green flex items-center gap-1"><TrendingUp size={12}/> {formatBRL(proj.incomes)}</span>
+                  <span className="text-xs text-red flex items-center gap-1"><TrendingDown size={12}/> {formatBRL(proj.expenses)}</span>
+                </div>
+              </div>
+              <span className={`font-bold ${proj.projectedBalance >= 0 ? 'text-green' : 'text-red'}`}>
+                {formatBRL(proj.projectedBalance)}
+              </span>
+            </div>
+          ))}
+        </div>
       </section>
     </div>
   );
