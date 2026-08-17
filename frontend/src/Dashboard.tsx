@@ -4,7 +4,7 @@ import { db } from './db';
 import { format, isSameMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Wallet, CreditCard, Users, TrendingUp, TrendingDown, DollarSign, CalendarDays } from 'lucide-react';
-import { calculateAccountBalance, calculatePeopleDebts, calculateMonthSummary, calculateProjections } from './finance-calculations';
+import { calculateAccountBalance, calculatePeopleDebts, calculateMonthSummary, calculateProjections, calculateCategoryBreakdown } from './finance-calculations';
 import { triggerAutoSync } from './GoogleSync';
 import Loader from './components/Loader';
 
@@ -73,6 +73,7 @@ export default function Dashboard() {
   const debtSummaries = Object.entries(peopleDebts).filter(([_, amount]) => amount !== 0);
 
   const { totalMonthIncome, totalMonthExpense, netMonth } = calculateMonthSummary(selectedMonthDate, transactions);
+  const categoryBreakdown = calculateCategoryBreakdown(transactions, selectedMonthDate);
 
   const projections = calculateProjections(totalBalance, selectedMonthDate, transactions, fixedEntries, 6);
 
@@ -124,6 +125,24 @@ export default function Dashboard() {
         </div>
       </section>
 
+      {categoryBreakdown.length > 0 && (
+        <section className="mb-8 card">
+          <h2 className="text-lg font-bold mb-4 border-b border-[var(--border-color)] pb-2">Gastos por Categoria</h2>
+          <div className="flex flex-col gap-3">
+            {categoryBreakdown.map(cat => (
+              <div key={cat.category}>
+                <div className="flex justify-between text-sm mb-1">
+                  <span>{cat.category}</span>
+                  <span className="font-semibold">{formatBRL(cat.amount)} ({cat.percentage.toFixed(1)}%)</span>
+                </div>
+                <div className="w-full bg-[var(--border-color)] rounded-full h-2">
+                  <div className="bg-red h-2 rounded-full" style={{ width: `${cat.percentage}%` }}></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
       <section className="mb-8 card">
         <h2 className="text-lg font-bold mb-4 flex items-center gap-2 border-b border-[var(--border-color)] pb-2">
           <CreditCard size={18} /> Faturas Projetadas

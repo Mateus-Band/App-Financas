@@ -104,3 +104,24 @@ export function calculateProjections(
 
   return projections;
 }
+
+export function calculateCategoryBreakdown(transactions: Transaction[], selectedMonthDate: Date) {
+  const currentMonthExpenses = transactions.filter(t => t.type === 'Expense' && isSameMonth(new Date(t.date), selectedMonthDate));
+  
+  const total = currentMonthExpenses.reduce((sum, t) => sum + t.amount, 0);
+  if (total === 0) return [];
+
+  const categoryMap = new Map<string, number>();
+  for (const t of currentMonthExpenses) {
+    const current = categoryMap.get(t.category) || 0;
+    categoryMap.set(t.category, current + t.amount);
+  }
+
+  return Array.from(categoryMap.entries())
+    .map(([category, amount]) => ({
+      category: category || 'Outros',
+      amount,
+      percentage: (amount / total) * 100
+    }))
+    .sort((a, b) => b.amount - a.amount);
+}

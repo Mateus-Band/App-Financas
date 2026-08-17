@@ -4,7 +4,8 @@ import {
   calculatePeopleDebts, 
   calculateMonthSummary, 
   calculateProjections,
-  projectFixedEntriesForMonth
+  projectFixedEntriesForMonth,
+  calculateCategoryBreakdown
 } from './finance-calculations';
 import type { Account, Transaction, Debt, FixedEntry } from './db';
 
@@ -19,11 +20,8 @@ describe('Finance Calculations', () => {
     const debts: Debt[] = [
       { id: 1, accountId: 1, type: 'Borrowed', amount: 300, personName: 'John', date: '2026-08-13', description: '' }
     ];
-    const fixedEntries: FixedEntry[] = [
-      { id: 1, accountId: 1, type: 'Expense', amount: 100, name: 'Netflix', day: 10 }
-    ];
 
-    // Balance: 1000 (base) + 500 (income) - 200 (expense, debit) + 300 (borrowed entered account) - 100 (fixed exp)
+    // Balance: 1000 (base) + 500 (income) - 200 (expense, debit) + 300 (borrowed entered account)
     // Credit expense is ignored for instant balance calculation in this model
     const balance = calculateAccountBalance(acc, transactions, debts);
     expect(balance).toBe(1000 + 500 - 200 + 300);
@@ -37,7 +35,7 @@ describe('Finance Calculations', () => {
     ];
     
     // Balance: 1500 (base from 15th) - 200 (expense on 16th). The 500 income from the 10th should be ignored.
-    const balance = calculateAccountBalance(acc, transactions, [], []);
+    const balance = calculateAccountBalance(acc, transactions, []);
     expect(balance).toBe(1500 - 200);
   });
 
@@ -102,5 +100,28 @@ describe('Finance Calculations', () => {
     // Proj 2: Oct 2026
     // Prev: 1400 + 500 (Salary) - 0 = 1900
     expect(projections[1].projectedBalance).toBe(1900);
+  });
+
+  it('calculates category breakdown correctly', () => {
+    const txs: Transaction[] = [
+      { accountId: 1, type: 'Expense', amount: 100, date: '2026-08-10', category: 'Lazer', description: '' },
+      { accountId: 1, type: 'Expense', amount: 300, date: '2026-08-11', category: 'Mercado', description: '' },
+      { accountId: 1, type: 'Expense', amount: 100, date: '2026-08-12', category: 'Lazer', description: '' },
+      { accountId: 1, type: 'Income', amount: 500, date: '2026-08-13', category: 'Salário', description: '' }, // Should be ignored
+      { accountId: 1, type: 'Expense', amount: 50, date: '2026-09-10', category: 'Mercado', description: '' } // Wrong month, ignored
+    ];
+
+    const breakdown = calculateCategoryBreakdown(txs, new Date('2026-08-15'));
+    
+    expect(breakdown).toHaveLength(2);
+    // Mercado: 300 (60%)
+    // Lazer: 200 (40%)
+    expect(breakdown[0].category).toBe('Mercado');
+    expect(breakdown[0].amount).toBe(300);
+    expect(breakdown[0].percentage).toBe(60);
+
+    expect(breakdown[1].category).toBe('Lazer');
+    expect(breakdown[1].amount).toBe(200);
+    expect(breakdown[1].percentage).toBe(40);
   });
 });
