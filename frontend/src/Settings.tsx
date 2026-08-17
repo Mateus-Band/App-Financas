@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './db';
 import { useGoogleLogin } from '@react-oauth/google';
 import { initGoogleDriveApi, uploadBackup, syncWithDrive, triggerAutoSync } from './GoogleSync';
+import { materializeFixedEntries } from './fixedEntries';
 import { Trash2, Plus, Download, Upload, Settings as SettingsIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import Loader from './components/Loader';
@@ -183,6 +184,7 @@ export default function Settings() {
     setFixedName('');
     setFixedAmount('');
     setFixedDay('');
+    await materializeFixedEntries();
     triggerAutoSync();
   };
 
