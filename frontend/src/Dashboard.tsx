@@ -44,6 +44,10 @@ export default function Dashboard() {
     return acc;
   }, {} as Record<string, number>);
 
+  const now = new Date();
+  const currentMonthDate = new Date(now.getFullYear(), now.getMonth(), 1);
+  const isFutureMonth = selectedMonthDate > currentMonthDate;
+
   const handlePayInvoice = async (accountId: number, accountName: string, amount: number) => {
     const txsToMark = creditTxs.filter(t => t.accountId === accountId && !t.invoicePaid);
     if (txsToMark.length === 0) return;
@@ -157,12 +161,14 @@ export default function Dashboard() {
                 <span className="text-secondary block text-sm">{acc.name}</span>
                 <span className="text-red font-semibold">{formatBRL(faturasByAccount[acc.name])}</span>
               </div>
-              <button 
-                onClick={() => handlePayInvoice(acc.id!, acc.name, faturasByAccount[acc.name])}
-                className="btn btn-outline text-xs px-2 py-1 border-green text-green hover:bg-green-500/10"
-              >
-                Pagar Fatura
-              </button>
+              {!isFutureMonth && (
+                <button 
+                  onClick={() => handlePayInvoice(acc.id!, acc.name, faturasByAccount[acc.name])}
+                  className="btn btn-outline text-xs px-2 py-1 border-green text-green hover:bg-green-500/10"
+                >
+                  Pagar Fatura
+                </button>
+              )}
             </div>
           ))
         )}
