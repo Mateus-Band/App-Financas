@@ -27,6 +27,18 @@ export default function Settings() {
   const [fixedDay, setFixedDay] = useState('');
   const [fixedAccountId, setFixedAccountId] = useState('');
 
+  const [theme, setTheme] = useState(localStorage.getItem('finance-theme') || 'purple');
+
+  const handleThemeChange = (newTheme: string) => {
+    setTheme(newTheme);
+    localStorage.setItem('finance-theme', newTheme);
+    if (newTheme === 'purple') {
+      document.documentElement.removeAttribute('data-theme');
+    } else {
+      document.documentElement.setAttribute('data-theme', newTheme);
+    }
+  };
+
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
 
@@ -221,6 +233,33 @@ export default function Settings() {
             Forçar Sincronização Agora
           </button>
         )}
+      </section>
+
+      {/* Theme Selection */}
+      <section className="mb-8 p-4 rounded-xl border border-[var(--border-color)] bg-[var(--surface-color)] flex flex-col gap-3">
+        <h3 className="font-semibold text-sm border-b border-[var(--border-color)] pb-2">Tema do App</h3>
+        <div className="flex flex-col gap-2">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="radio" name="theme" checked={theme === 'purple'} onChange={() => handleThemeChange('purple')} />
+            <span style={{ color: '#8b5cf6' }} className="font-semibold">Roxo Escuro (Padrão)</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="radio" name="theme" checked={theme === 'red'} onChange={() => handleThemeChange('red')} />
+            <span style={{ color: '#f65c5c' }} className="font-semibold">Vermelho Escuro</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="radio" name="theme" checked={theme === 'blue'} onChange={() => handleThemeChange('blue')} />
+            <span style={{ color: '#5c8bf6' }} className="font-semibold">Azul Escuro</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="radio" name="theme" checked={theme === 'green'} onChange={() => handleThemeChange('green')} />
+            <span style={{ color: '#5cf65c' }} className="font-semibold">Verde Escuro</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="radio" name="theme" checked={theme === 'mono'} onChange={() => handleThemeChange('mono')} />
+            <span style={{ color: '#d4d4d4' }} className="font-semibold">Preto e Branco</span>
+          </label>
+        </div>
       </section>
 
       {/* Accounts Management */}

@@ -35,6 +35,11 @@ function App() {
     seedDatabase().then(() => {
       materializeFixedEntries().catch(e => console.error('Erro ao materializar fixos:', e));
     });
+    
+    const savedTheme = localStorage.getItem('finance-theme') || 'purple';
+    if (savedTheme !== 'purple') {
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
   }, []);
 
   const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || 'MISSING_CLIENT_ID';
