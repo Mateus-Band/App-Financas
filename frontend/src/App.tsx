@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { HashRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Home, PlusCircle, Settings as SettingsIcon } from 'lucide-react';
 import { seedDatabase } from './seed';
 import Dashboard from './Dashboard';
@@ -37,7 +37,7 @@ function App() {
 
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      <BrowserRouter>
+      <HashRouter>
         <div className="container">
           <Routes>
             <Route path="/" element={<Dashboard />} />
@@ -46,7 +46,7 @@ function App() {
           </Routes>
         </div>
         <Navigation />
-      </BrowserRouter>
+      </HashRouter>
     </GoogleOAuthProvider>
   );
 }
