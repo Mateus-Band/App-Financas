@@ -172,3 +172,16 @@ export const syncWithDrive = async (accessToken: string) => {
   // After merging locally, upload the new merged state to Drive
   await uploadBackup(accessToken);
 };
+
+let syncTimeout: any;
+
+export const triggerAutoSync = () => {
+  clearTimeout(syncTimeout);
+  syncTimeout = setTimeout(() => {
+    const token = localStorage.getItem('gdrive_token');
+    if (token) {
+      console.log('Auto-syncing to Google Drive...');
+      uploadBackup(token).catch(e => console.error('Auto sync error:', e));
+    }
+  }, 10000); // 10 seconds debounce
+};

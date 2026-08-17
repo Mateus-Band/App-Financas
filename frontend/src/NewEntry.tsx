@@ -4,7 +4,7 @@ import { db } from './db';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { addMonths, format } from 'date-fns';
-import { uploadBackup } from './GoogleSync';
+import { triggerAutoSync } from './GoogleSync';
 import Loader from './components/Loader';
 
 type EntryType = 'Income' | 'Expense' | 'Debt' | null;
@@ -107,10 +107,7 @@ export default function NewEntry() {
     }
 
     // Auto-sync after saving
-    const token = localStorage.getItem('gdrive_token');
-    if (token) {
-      uploadBackup(token).catch(e => console.error("Auto-sync failed", e));
-    }
+    triggerAutoSync();
 
     navigate('/'); // Redirect to dashboard
   };

@@ -24,6 +24,7 @@ export interface Transaction {
   installmentGroupId?: string;
   personName?: string; // For debts
   sourceFixedEntryId?: number;
+  invoicePaid?: boolean;
   updatedAt?: string;
 }
 

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './db';
 import { useGoogleLogin } from '@react-oauth/google';
-import { initGoogleDriveApi, uploadBackup, syncWithDrive } from './GoogleSync';
+import { initGoogleDriveApi, uploadBackup, syncWithDrive, triggerAutoSync } from './GoogleSync';
 import { Trash2, Plus, Download, Upload, Settings as SettingsIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import Loader from './components/Loader';
@@ -89,11 +89,6 @@ export default function Settings() {
     localStorage.removeItem('gdrive_token');
     setGoogleToken(null);
     setSyncStatus('Desconectado');
-  };
-
-  const triggerAutoSync = () => {
-    const token = localStorage.getItem('gdrive_token');
-    if (token) uploadBackup(token).catch(e => console.error(e));
   };
 
   // --- MANUAL BACKUP LOGIC ---

@@ -5,6 +5,7 @@ import { format, isSameMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Wallet, CreditCard, Users, TrendingUp, TrendingDown, DollarSign, CalendarDays } from 'lucide-react';
 import { calculateAccountBalance, calculatePeopleDebts, calculateMonthSummary, calculateProjections } from './finance-calculations';
+import { triggerAutoSync } from './GoogleSync';
 import Loader from './components/Loader';
 
 export default function Dashboard() {
@@ -37,10 +38,36 @@ export default function Dashboard() {
   });
 
   const faturasByAccount = accounts.reduce((acc, account) => {
-    const accCredit = creditTxs.filter(t => t.accountId === account.id).reduce((sum, t) => sum + t.amount, 0);
+    const accCredit = creditTxs.filter(t => t.accountId === account.id && !t.invoicePaid).reduce((sum, t) => sum + t.amount, 0);
     acc[account.name] = accCredit;
     return acc;
   }, {} as Record<string, number>);
+
+  const handlePayInvoice = async (accountId: number, accountName: string, amount: number) => {
+    const txsToMark = creditTxs.filter(t => t.accountId === accountId && !t.invoicePaid);
+    if (txsToMark.length === 0) return;
+
+    if (!confirm(`Confirmar o pagamento da fatura de ${accountName} no valor de ${formatBRL(amount)}?`)) return;
+
+    await db.transaction('rw', db.transactions, async () => {
+      // Create debit transaction
+      await db.transactions.add({
+        type: 'Expense',
+        category: 'Fatura Cartão',
+        description: `Fatura ${accountName} - ${format(selectedMonthDate, 'MM/yyyy')}`,
+        amount: amount,
+        accountId: accountId,
+        paymentMethod: 'Débito',
+        date: format(new Date(), 'yyyy-MM-dd'),
+        updatedAt: new Date().toISOString()
+      });
+
+      // Mark all as paid
+      await Promise.all(txsToMark.map(t => db.transactions.update(t.id!, { invoicePaid: true, updatedAt: new Date().toISOString() })));
+    });
+
+    triggerAutoSync();
+  };
 
   const peopleDebts = calculatePeopleDebts(debts);
   const debtSummaries = Object.entries(peopleDebts).filter(([_, amount]) => amount !== 0);
@@ -105,9 +132,17 @@ export default function Dashboard() {
           <p className="text-sm text-secondary">Nenhuma fatura para este mês.</p>
         ) : (
           accounts.filter(a => faturasByAccount[a.name] > 0).map(acc => (
-            <div key={acc.id} className="flex justify-between mb-2 last:mb-0">
-              <span className="text-secondary">{acc.name}</span>
-              <span className="text-red font-semibold">{formatBRL(faturasByAccount[acc.name])}</span>
+            <div key={acc.id} className="flex justify-between items-center mb-2 last:mb-0 border border-[var(--border-color)] p-3 rounded-lg">
+              <div>
+                <span className="text-secondary block text-sm">{acc.name}</span>
+                <span className="text-red font-semibold">{formatBRL(faturasByAccount[acc.name])}</span>
+              </div>
+              <button 
+                onClick={() => handlePayInvoice(acc.id!, acc.name, faturasByAccount[acc.name])}
+                className="btn btn-outline text-xs px-2 py-1 border-green text-green hover:bg-green-500/10"
+              >
+                Pagar Fatura
+              </button>
             </div>
           ))
         )}
