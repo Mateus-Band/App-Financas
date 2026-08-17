@@ -48,6 +48,7 @@ export interface FixedEntry {
   accountId: number;
   startDate?: string;
   updatedAt?: string;
+  skippedMonths?: string[];
 }
 
 export class FinanceDatabase extends Dexie {

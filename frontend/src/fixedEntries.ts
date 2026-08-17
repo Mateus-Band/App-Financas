@@ -40,9 +40,13 @@ export async function materializeFixedEntries() {
       
       occurenceDate.setDate(targetDay);
       
-      // We only materialize up to 'today'
-      if (!isAfter(occurenceDate, today)) {
-        const monthStr = format(occurenceDate, 'yyyy-MM');
+        if (!isAfter(occurenceDate, today)) {
+          const monthStr = format(occurenceDate, 'yyyy-MM');
+          
+          if (fixed.skippedMonths && fixed.skippedMonths.includes(monthStr)) {
+            currentMonthDate = addMonths(currentMonthDate, 1);
+            continue;
+          }
         
         // Check if transaction already exists
         const existingTx = await db.transactions

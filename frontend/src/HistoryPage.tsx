@@ -5,6 +5,7 @@ import { ArrowLeft, Search, Filter, Trash2, Edit2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import Loader from './components/Loader';
+import { triggerAutoSync } from './GoogleSync';
 
 export default function HistoryPage() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -36,21 +37,38 @@ export default function HistoryPage() {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
   };
 
-  const handleDelete = async (id: number, isDebt: boolean, isInstallment?: boolean, groupId?: string) => {
-    if (isInstallment && groupId) {
+  const handleDelete = async (t: any) => {
+    const { id, isDebt, isInstallment, installmentGroupId, sourceFixedEntryId, date } = t;
+    if (isInstallment && installmentGroupId) {
       const option = confirm('Deseja apagar APENAS esta parcela (OK) ou TODAS as parcelas deste grupo (Cancelar)?');
       if (option) {
         await db.transactions.delete(id);
       } else {
-        const toDelete = await db.transactions.where({ installmentGroupId: groupId }).primaryKeys();
+        const toDelete = await db.transactions.where({ installmentGroupId }).primaryKeys();
         await db.transactions.bulkDelete(toDelete as number[]);
       }
     } else {
       if (confirm('Tem certeza que deseja apagar este lançamento?')) {
-        if (isDebt) await db.debts.delete(id);
-        else await db.transactions.delete(id);
+        if (isDebt) {
+          await db.debts.delete(id);
+        } else {
+          await db.transactions.delete(id);
+          if (sourceFixedEntryId) {
+            const fixed = await db.fixedEntries.get(sourceFixedEntryId);
+            if (fixed) {
+              const monthStr = date.slice(0, 7);
+              const skipped = fixed.skippedMonths || [];
+              if (!skipped.includes(monthStr)) {
+                await db.fixedEntries.update(sourceFixedEntryId, { skippedMonths: [...skipped, monthStr] });
+              }
+            }
+          }
+        }
+      } else {
+        return;
       }
     }
+    triggerAutoSync();
   };
 
   return (
@@ -114,7 +132,7 @@ export default function HistoryPage() {
                   <Edit2 size={16} />
                 </Link>
                 <button 
-                  onClick={() => handleDelete(t.id!, t.isDebt, (t as any).isInstallment, (t as any).installmentGroupId)}
+                  onClick={() => handleDelete(t)}
                   className="p-2 text-red hover:bg-red-500/10 rounded-full"
                 >
                   <Trash2 size={16} />
