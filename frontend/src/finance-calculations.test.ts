@@ -58,6 +58,13 @@ describe('Finance Calculations', () => {
     const sepSummary = calculateMonthSummary(new Date('2026-09-10'), txs, fixed);
     expect(sepSummary.totalMonthIncome).toBe(0);
     expect(sepSummary.totalMonthExpense).toBe(350); // 200 (var) + 150 (fixed Gym)
+
+    // Test with a full ISO string (what the buggy UI generated)
+    const fixedISO: FixedEntry[] = [
+      { accountId: 1, type: 'Expense', amount: 50, name: 'Spotify', day: 5, startDate: '2026-08-17T18:32:10.482Z' }
+    ];
+    const augISOSummary = calculateMonthSummary(new Date('2026-08-10'), [], fixedISO);
+    expect(augISOSummary.totalMonthExpense).toBe(50); // Spotify started in Aug
   });
 
   it('calculates future projections correctly', () => {

@@ -4,6 +4,7 @@ import { db } from './db';
 import { useGoogleLogin } from '@react-oauth/google';
 import { initGoogleDriveApi, uploadBackup, syncWithDrive } from './GoogleSync';
 import { Trash2, Plus, Download, Upload, Settings as SettingsIcon } from 'lucide-react';
+import { format } from 'date-fns';
 import Loader from './components/Loader';
 import Toast from './components/Toast';
 
@@ -168,7 +169,7 @@ export default function Settings() {
       amount: parseFloat(fixedAmount),
       day: parseInt(fixedDay),
       accountId: parseInt(fixedAccountId),
-      startDate: new Date().toISOString(),
+      startDate: format(new Date(), 'yyyy-MM-dd'),
       updatedAt: new Date().toISOString()
     });
     setFixedName('');

@@ -48,7 +48,8 @@ export function calculateMonthSummary(
   const activeFixedEntries = fixedEntries.filter(f => {
     // If it has no startDate, assume it's always active
     if (!f.startDate) return true;
-    const start = new Date(f.startDate + 'T12:00:00');
+    const start = f.startDate.includes('T') ? new Date(f.startDate) : new Date(f.startDate + 'T12:00:00');
+    if (isNaN(start.getTime())) return true; // fallback
     // Compare year and month
     const startNum = start.getFullYear() * 12 + start.getMonth();
     const selectedNum = selectedMonthDate.getFullYear() * 12 + selectedMonthDate.getMonth();
