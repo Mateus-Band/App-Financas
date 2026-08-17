@@ -39,10 +39,6 @@ export default function Settings() {
     }).catch(e => console.error(e));
   }, []);
 
-  if (accounts === undefined || fixedEntries === undefined) {
-    return <Loader />;
-  }
-
   // --- GOOGLE SYNC LOGIC ---
   const login = useGoogleLogin({
     scope: 'https://www.googleapis.com/auth/drive.appdata',
@@ -71,6 +67,11 @@ export default function Settings() {
       alert('Login falhou');
     }
   });
+
+  if (accounts === undefined || fixedEntries === undefined) {
+    return <Loader />;
+  }
+
 
   const handleManualSync = async () => {
     if (!googleToken) return;
