@@ -5,6 +5,7 @@ export interface Account {
   id?: number;
   name: string;
   balance: number;
+  balanceAsOf?: string;
   updatedAt?: string;
 }
 
@@ -84,6 +85,17 @@ export class FinanceDatabase extends Dexie {
           entry.startDate = '2000-01-01'; // Padrão antigo para não sumir
         })
       ]);
+    });
+
+    this.version(3).stores({
+      accounts: '++id, name',
+      transactions: '++id, date, type, accountId, paymentMethod, installmentGroupId',
+      debts: '++id, personName, type, date',
+      fixedEntries: '++id, type, day'
+    }).upgrade(tx => {
+      return tx.table('accounts').toCollection().modify(account => {
+        account.balanceAsOf = '2000-01-01';
+      });
     });
   }
 }

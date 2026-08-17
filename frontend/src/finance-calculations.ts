@@ -8,8 +8,9 @@ export function calculateAccountBalance(
   debts: Debt[],
   fixedEntries: FixedEntry[]
 ): number {
-  const accTxs = transactions.filter(t => t.accountId === acc.id);
-  const accDebts = debts.filter(d => d.accountId === acc.id);
+  const cutoffDate = acc.balanceAsOf || '2000-01-01';
+  const accTxs = transactions.filter(t => t.accountId === acc.id && t.date >= cutoffDate);
+  const accDebts = debts.filter(d => d.accountId === acc.id && d.date >= cutoffDate);
 
   const incomes = accTxs.filter(t => t.type === 'Income').reduce((sum, t) => sum + t.amount, 0);
   const expenses = accTxs.filter(t => t.type === 'Expense' && t.paymentMethod !== 'Crédito').reduce((sum, t) => sum + t.amount, 0);

@@ -143,6 +143,7 @@ export default function Settings() {
     if (isNaN(newBalance)) return;
     await db.accounts.update(id, { 
       balance: newBalance,
+      balanceAsOf: format(new Date(), 'yyyy-MM-dd'),
       updatedAt: new Date().toISOString()
     });
     triggerAutoSync();
@@ -222,7 +223,7 @@ export default function Settings() {
               <div>
                 <p className="font-semibold">{acc.name}</p>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="text-xs text-secondary">Saldo Inicial: R$</span>
+                  <span className="text-xs text-secondary">Saldo Atual (ajustar quando conferir extrato): R$</span>
                   <input 
                     type="number" 
                     className="input-field text-sm" 

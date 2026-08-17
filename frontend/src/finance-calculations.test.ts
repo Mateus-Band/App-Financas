@@ -28,6 +28,18 @@ describe('Finance Calculations', () => {
     expect(balance).toBe(1000 + 500 - 200 + 300 - 100);
   });
 
+  it('calculates account balance ignoring entries before balanceAsOf', () => {
+    const acc: Account = { id: 1, name: 'Bank', balance: 1500, balanceAsOf: '2026-08-15' };
+    const transactions: Transaction[] = [
+      { id: 1, accountId: 1, type: 'Income', amount: 500, date: '2026-08-10', category: '', description: 'Old Income' },
+      { id: 2, accountId: 1, type: 'Expense', amount: 200, paymentMethod: 'Débito', date: '2026-08-16', category: '', description: 'New Expense' }
+    ];
+    
+    // Balance: 1500 (base from 15th) - 200 (expense on 16th). The 500 income from the 10th should be ignored.
+    const balance = calculateAccountBalance(acc, transactions, [], []);
+    expect(balance).toBe(1500 - 200);
+  });
+
   it('calculates people debts correctly', () => {
     const debts: Debt[] = [
       { accountId: 1, type: 'Lent', amount: 100, personName: 'John', date: '', description: '' },
