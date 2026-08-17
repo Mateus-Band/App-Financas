@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './db';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { addMonths, format } from 'date-fns';
 import { triggerAutoSync } from './GoogleSync';
@@ -11,6 +11,10 @@ type EntryType = 'Income' | 'Expense' | 'Debt' | null;
 
 export default function NewEntry() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get('edit');
+  const isDebtEdit = searchParams.get('isDebt') === 'true';
+
   const accounts = useLiveQuery(() => db.accounts.toArray());
   
   const [step, setStep] = useState(1);
@@ -36,6 +40,44 @@ export default function NewEntry() {
     setStep(2);
   };
 
+  // Load data for edit
+  useState(() => {
+    if (editId) {
+      const id = parseInt(editId);
+      if (isDebtEdit) {
+        db.debts.get(id).then(d => {
+          if (d) {
+            setStep(2);
+            setType('Debt');
+            setPersonName(d.personName);
+            setDebtType(d.type);
+            setAmount(d.amount.toString());
+            setDescription(d.description);
+            setAccountId(d.accountId.toString());
+          }
+        });
+      } else {
+        db.transactions.get(id).then(t => {
+          if (t) {
+            setStep(2);
+            setType(t.type as EntryType);
+            setCategory(t.category);
+            setDescription(t.description);
+            setAmount(t.amount.toString());
+            setAccountId(t.accountId.toString());
+            if (t.type === 'Expense') {
+              setPaymentMethod(t.paymentMethod || '');
+              if (t.isInstallment) {
+                setIsInstallment(true);
+                setInstallmentCount(t.installmentCount?.toString() || '2');
+              }
+            }
+          }
+        });
+      }
+    }
+  });
+
   if (accounts === undefined) {
     return <Loader />;
   }
@@ -49,16 +91,18 @@ export default function NewEntry() {
     const updatedAt = new Date().toISOString();
 
     if (type === 'Income') {
-      await db.transactions.add({
+      const data = {
         date,
-        type: 'Income',
+        type: 'Income' as const,
         category,
         description,
         amount: numAmount,
         accountId: parseInt(accountId),
         updatedAt
-      });
-    } 
+      };
+      if (editId && !isDebtEdit) await db.transactions.update(parseInt(editId), data);
+      else await db.transactions.add(data);
+    }
     else if (type === 'Expense') {
       if (paymentMethod === 'Crédito' && isInstallment) {
         const count = parseInt(installmentCount);
@@ -82,20 +126,22 @@ export default function NewEntry() {
         
         await db.transactions.bulkAdd(installments);
       } else {
-        await db.transactions.add({
+        const data = {
           date,
-          type: 'Expense',
+          type: 'Expense' as const,
           category,
           description,
           amount: numAmount,
           accountId: parseInt(accountId),
           paymentMethod: paymentMethod as any,
           updatedAt
-        });
+        };
+        if (editId && !isDebtEdit) await db.transactions.update(parseInt(editId), data);
+        else await db.transactions.add(data);
       }
     }
     else if (type === 'Debt') {
-      await db.debts.add({
+      const data = {
         personName,
         type: debtType as any,
         amount: numAmount,
@@ -103,7 +149,9 @@ export default function NewEntry() {
         date,
         accountId: parseInt(accountId),
         updatedAt
-      });
+      };
+      if (editId && isDebtEdit) await db.debts.update(parseInt(editId), data);
+      else await db.debts.add(data);
     }
 
     // Auto-sync after saving
@@ -120,7 +168,7 @@ export default function NewEntry() {
             <ArrowLeft size={20} />
           </button>
         )}
-        <h1 className="text-2xl font-bold">Novo Lançamento</h1>
+        <h1 className="text-2xl font-bold">{editId ? 'Editar Lançamento' : 'Novo Lançamento'}</h1>
       </div>
 
       <div className="card">

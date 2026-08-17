@@ -149,8 +149,20 @@ export default function Settings() {
       showToast('A conta "Dinheiro físico" não pode ser apagada.', 'error');
       return;
     }
-    if (confirm(`Tem certeza que deseja apagar a conta ${name}?`)) {
-      await db.accounts.delete(id);
+    if (confirm(`Tem certeza que deseja apagar a conta "${name}"? Todas as transações, dívidas e fixos relacionados a essa conta também serão apagados irremediavelmente.`)) {
+      await db.transaction('rw', db.accounts, db.transactions, db.fixedEntries, db.debts, async () => {
+        await db.accounts.delete(id);
+        const txToDelete = await db.transactions.where({ accountId: id }).primaryKeys();
+        await db.transactions.bulkDelete(txToDelete as number[]);
+        
+        const allFixed = await db.fixedEntries.toArray();
+        const fixedToDelete = allFixed.filter(f => f.accountId === id).map(f => f.id!);
+        await db.fixedEntries.bulkDelete(fixedToDelete);
+        
+        const allDebts = await db.debts.toArray();
+        const debtsToDelete = allDebts.filter(d => d.accountId === id).map(d => d.id!);
+        await db.debts.bulkDelete(debtsToDelete);
+      });
       triggerAutoSync();
     }
   };
