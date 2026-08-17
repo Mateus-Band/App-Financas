@@ -25,11 +25,13 @@ export default function NewEntry() {
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [accountId, setAccountId] = useState('');
+  const [entryDate, setEntryDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   
   // Expense specific
   const [paymentMethod, setPaymentMethod] = useState('');
   const [isInstallment, setIsInstallment] = useState(false);
   const [installmentCount, setInstallmentCount] = useState('2');
+  const [originalGroupId, setOriginalGroupId] = useState<string | undefined>(undefined);
   
   // Debt specific
   const [debtType, setDebtType] = useState('');
@@ -54,6 +56,7 @@ export default function NewEntry() {
             setAmount(d.amount.toString());
             setDescription(d.description);
             setAccountId(d.accountId.toString());
+            setEntryDate(d.date);
           }
         });
       } else {
@@ -65,11 +68,17 @@ export default function NewEntry() {
             setDescription(t.description);
             setAmount(t.amount.toString());
             setAccountId(t.accountId.toString());
+            setEntryDate(t.date);
             if (t.type === 'Expense') {
               setPaymentMethod(t.paymentMethod || '');
               if (t.isInstallment) {
                 setIsInstallment(true);
                 setInstallmentCount(t.installmentCount?.toString() || '2');
+                setOriginalGroupId(t.installmentGroupId);
+                // Also set total amount for the group instead of a single installment amount
+                if (t.installmentCount && t.amount) {
+                  setAmount((t.amount * t.installmentCount).toString());
+                }
               }
             }
           }
@@ -87,7 +96,7 @@ export default function NewEntry() {
     if (!type || !accountId || !amount) return;
     
     const numAmount = parseFloat(amount);
-    const date = format(new Date(), 'yyyy-MM-dd'); // Today
+    const date = entryDate;
     const updatedAt = new Date().toISOString();
 
     if (type === 'Income') {
@@ -110,7 +119,8 @@ export default function NewEntry() {
         const groupId = crypto.randomUUID();
         
         const installments = Array.from({ length: count }).map((_, i) => ({
-          date: format(addMonths(new Date(), i), 'yyyy-MM-dd'),
+          // Fix: when editing an existing group, date offset should probably be based on the edited date
+          date: format(addMonths(new Date(entryDate + 'T00:00:00'), i), 'yyyy-MM-dd'),
           type: 'Expense' as const,
           category,
           description,
@@ -124,6 +134,12 @@ export default function NewEntry() {
           updatedAt
         }));
         
+        if (editId && originalGroupId) {
+          const toDelete = await db.transactions.where({ installmentGroupId: originalGroupId }).primaryKeys();
+          await db.transactions.bulkDelete(toDelete as number[]);
+        } else if (editId) {
+          await db.transactions.delete(parseInt(editId));
+        }
         await db.transactions.bulkAdd(installments);
       } else {
         const data = {
@@ -136,8 +152,15 @@ export default function NewEntry() {
           paymentMethod: paymentMethod as any,
           updatedAt
         };
-        if (editId && !isDebtEdit) await db.transactions.update(parseInt(editId), data);
-        else await db.transactions.add(data);
+        if (editId && originalGroupId) {
+          const toDelete = await db.transactions.where({ installmentGroupId: originalGroupId }).primaryKeys();
+          await db.transactions.bulkDelete(toDelete as number[]);
+          await db.transactions.add(data);
+        } else if (editId && !isDebtEdit) {
+          await db.transactions.update(parseInt(editId), data);
+        } else {
+          await db.transactions.add(data);
+        }
       }
     }
     else if (type === 'Debt') {
@@ -232,6 +255,17 @@ export default function NewEntry() {
                 </select>
               </div>
             )}
+
+            <div className="form-group">
+              <label className="input-label">Data</label>
+              <input 
+                type="date" 
+                className="input-field" 
+                value={entryDate}
+                onChange={(e) => setEntryDate(e.target.value)}
+                required
+              />
+            </div>
 
             <div className="form-group">
               <label className="input-label">Descrição</label>
