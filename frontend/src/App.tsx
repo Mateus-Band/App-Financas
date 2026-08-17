@@ -33,7 +33,7 @@ function App() {
     seedDatabase();
   }, []);
 
-  const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || 'MISSING_CLIENT_ID';
 
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
