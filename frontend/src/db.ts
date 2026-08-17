@@ -23,6 +23,7 @@ export interface Transaction {
   currentInstallment?: number;
   installmentGroupId?: string;
   personName?: string; // For debts
+  sourceFixedEntryId?: number;
   updatedAt?: string;
 }
 
@@ -96,6 +97,13 @@ export class FinanceDatabase extends Dexie {
       return tx.table('accounts').toCollection().modify(account => {
         account.balanceAsOf = '2000-01-01';
       });
+    });
+
+    this.version(4).stores({
+      accounts: '++id, name',
+      transactions: '++id, date, type, accountId, paymentMethod, installmentGroupId, sourceFixedEntryId',
+      debts: '++id, personName, type, date',
+      fixedEntries: '++id, type, day'
     });
   }
 }

@@ -5,8 +5,7 @@ import type { Account, Transaction, Debt, FixedEntry } from './db';
 export function calculateAccountBalance(
   acc: Account,
   transactions: Transaction[],
-  debts: Debt[],
-  fixedEntries: FixedEntry[]
+  debts: Debt[]
 ): number {
   const cutoffDate = acc.balanceAsOf || '2000-01-01';
   const accTxs = transactions.filter(t => t.accountId === acc.id && t.date >= cutoffDate);
@@ -22,10 +21,7 @@ export function calculateAccountBalance(
 
   const debtNet = borrowed + received - lent - paid;
   
-  const fixedInc = fixedEntries.filter(f => f.accountId === acc.id && f.type === 'Income').reduce((sum, f) => sum + f.amount, 0);
-  const fixedExp = fixedEntries.filter(f => f.accountId === acc.id && f.type === 'Expense').reduce((sum, f) => sum + f.amount, 0);
-
-  return acc.balance + incomes + fixedInc - expenses - fixedExp + debtNet;
+  return acc.balance + incomes - expenses + debtNet;
 }
 
 export function calculatePeopleDebts(debts: Debt[]) {
@@ -39,32 +35,33 @@ export function calculatePeopleDebts(debts: Debt[]) {
 
 export function calculateMonthSummary(
   selectedMonthDate: Date,
-  transactions: Transaction[],
-  fixedEntries: FixedEntry[]
+  transactions: Transaction[]
 ) {
   const currentMonthTxs = transactions.filter(t => isSameMonth(new Date(t.date), selectedMonthDate));
   const monthVarIncomes = currentMonthTxs.filter(t => t.type === 'Income').reduce((sum, t) => sum + t.amount, 0);
   const monthVarExpenses = currentMonthTxs.filter(t => t.type === 'Expense').reduce((sum, t) => sum + t.amount, 0);
   
+  return {
+    totalMonthIncome: monthVarIncomes,
+    totalMonthExpense: monthVarExpenses,
+    netMonth: monthVarIncomes - monthVarExpenses
+  };
+}
+
+export function projectFixedEntriesForMonth(fixedEntries: FixedEntry[], projDate: Date) {
   const activeFixedEntries = fixedEntries.filter(f => {
-    // If it has no startDate, assume it's always active
     if (!f.startDate) return true;
     const start = f.startDate.includes('T') ? new Date(f.startDate) : new Date(f.startDate + 'T12:00:00');
-    if (isNaN(start.getTime())) return true; // fallback
-    // Compare year and month
+    if (isNaN(start.getTime())) return true;
     const startNum = start.getFullYear() * 12 + start.getMonth();
-    const selectedNum = selectedMonthDate.getFullYear() * 12 + selectedMonthDate.getMonth();
+    const selectedNum = projDate.getFullYear() * 12 + projDate.getMonth();
     return startNum <= selectedNum;
   });
 
   const monthFixedIncomes = activeFixedEntries.filter(f => f.type === 'Income').reduce((sum, f) => sum + f.amount, 0);
   const monthFixedExpenses = activeFixedEntries.filter(f => f.type === 'Expense').reduce((sum, f) => sum + f.amount, 0);
 
-  return {
-    totalMonthIncome: monthVarIncomes + monthFixedIncomes,
-    totalMonthExpense: monthVarExpenses + monthFixedExpenses,
-    netMonth: (monthVarIncomes + monthFixedIncomes) - (monthVarExpenses + monthFixedExpenses)
-  };
+  return { monthFixedIncomes, monthFixedExpenses };
 }
 
 export interface ProjectionMonth {
@@ -87,16 +84,20 @@ export function calculateProjections(
 
   for (let i = 1; i <= monthsToProject; i++) {
     const projDate = addMonths(startMonthDate, i);
-    const { totalMonthIncome, totalMonthExpense } = calculateMonthSummary(projDate, transactions, fixedEntries);
+    const { totalMonthIncome, totalMonthExpense } = calculateMonthSummary(projDate, transactions);
+    const { monthFixedIncomes, monthFixedExpenses } = projectFixedEntriesForMonth(fixedEntries, projDate);
     
-    currentProjectedBalance += totalMonthIncome;
-    currentProjectedBalance -= totalMonthExpense;
+    const projIncome = totalMonthIncome + monthFixedIncomes;
+    const projExpense = totalMonthExpense + monthFixedExpenses;
+
+    currentProjectedBalance += projIncome;
+    currentProjectedBalance -= projExpense;
 
     projections.push({
       date: projDate,
       label: projDate.toISOString().slice(0, 7),
-      incomes: totalMonthIncome,
-      expenses: totalMonthExpense,
+      incomes: projIncome,
+      expenses: projExpense,
       projectedBalance: currentProjectedBalance
     });
   }

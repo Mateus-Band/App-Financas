@@ -3,7 +3,8 @@ import {
   calculateAccountBalance, 
   calculatePeopleDebts, 
   calculateMonthSummary, 
-  calculateProjections 
+  calculateProjections,
+  projectFixedEntriesForMonth
 } from './finance-calculations';
 import type { Account, Transaction, Debt, FixedEntry } from './db';
 
@@ -24,8 +25,8 @@ describe('Finance Calculations', () => {
 
     // Balance: 1000 (base) + 500 (income) - 200 (expense, debit) + 300 (borrowed entered account) - 100 (fixed exp)
     // Credit expense is ignored for instant balance calculation in this model
-    const balance = calculateAccountBalance(acc, transactions, debts, fixedEntries);
-    expect(balance).toBe(1000 + 500 - 200 + 300 - 100);
+    const balance = calculateAccountBalance(acc, transactions, debts);
+    expect(balance).toBe(1000 + 500 - 200 + 300);
   });
 
   it('calculates account balance ignoring entries before balanceAsOf', () => {
@@ -63,20 +64,24 @@ describe('Finance Calculations', () => {
       { accountId: 1, type: 'Expense', amount: 150, name: 'Gym', day: 5, startDate: '2026-09-01' }
     ];
 
-    const augSummary = calculateMonthSummary(new Date('2026-08-10'), txs, fixed);
+    const augSummary = calculateMonthSummary(new Date('2026-08-10'), txs);
     expect(augSummary.totalMonthIncome).toBe(1000);
-    expect(augSummary.totalMonthExpense).toBe(0); // Gym hasn't started yet!
+    expect(augSummary.totalMonthExpense).toBe(0);
 
-    const sepSummary = calculateMonthSummary(new Date('2026-09-10'), txs, fixed);
+    const sepSummary = calculateMonthSummary(new Date('2026-09-10'), txs);
     expect(sepSummary.totalMonthIncome).toBe(0);
-    expect(sepSummary.totalMonthExpense).toBe(350); // 200 (var) + 150 (fixed Gym)
+    expect(sepSummary.totalMonthExpense).toBe(200);
+
+    // Test projectFixedEntriesForMonth instead of calculateMonthSummary for fixed
+    const { monthFixedExpenses } = projectFixedEntriesForMonth(fixed, new Date('2026-09-10'));
+    expect(monthFixedExpenses).toBe(150);
 
     // Test with a full ISO string (what the buggy UI generated)
     const fixedISO: FixedEntry[] = [
       { accountId: 1, type: 'Expense', amount: 50, name: 'Spotify', day: 5, startDate: '2026-08-17T18:32:10.482Z' }
     ];
-    const augISOSummary = calculateMonthSummary(new Date('2026-08-10'), [], fixedISO);
-    expect(augISOSummary.totalMonthExpense).toBe(50); // Spotify started in Aug
+    const { monthFixedExpenses: augISOExp } = projectFixedEntriesForMonth(fixedISO, new Date('2026-08-10'));
+    expect(augISOExp).toBe(50); // Spotify started in Aug
   });
 
   it('calculates future projections correctly', () => {
@@ -90,7 +95,8 @@ describe('Finance Calculations', () => {
     const projections = calculateProjections(1000, new Date('2026-08-15'), txs, fixed, 2);
     
     // Proj 1: Sep 2026
-    // Base: 1000 + 500 (Salary) - 100 (Expense) = 1400
+    // Base: 1000 - 100 (Expense) = 900. Plus 500 (Salary) = 1400.
+    // Wait, the projection base calculation changed to just baseBalance + projIncome - projExpense.
     expect(projections[0].projectedBalance).toBe(1400);
 
     // Proj 2: Oct 2026

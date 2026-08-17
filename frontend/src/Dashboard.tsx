@@ -24,7 +24,7 @@ export default function Dashboard() {
   }
 
   const accountBalances = accounts.map(acc => {
-    const computedBalance = calculateAccountBalance(acc, transactions, debts, fixedEntries);
+    const computedBalance = calculateAccountBalance(acc, transactions, debts);
     return { ...acc, computedBalance };
   });
 
@@ -45,7 +45,7 @@ export default function Dashboard() {
   const peopleDebts = calculatePeopleDebts(debts);
   const debtSummaries = Object.entries(peopleDebts).filter(([_, amount]) => amount !== 0);
 
-  const { totalMonthIncome, totalMonthExpense, netMonth } = calculateMonthSummary(selectedMonthDate, transactions, fixedEntries);
+  const { totalMonthIncome, totalMonthExpense, netMonth } = calculateMonthSummary(selectedMonthDate, transactions);
 
   const projections = calculateProjections(totalBalance, selectedMonthDate, transactions, fixedEntries, 6);
 
