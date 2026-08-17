@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './db';
 import { format, isSameMonth } from 'date-fns';
@@ -209,6 +210,10 @@ export default function Dashboard() {
                 </span>
               </div>
             ))}
+            
+            <Link to="/history" className="btn btn-outline w-full mt-2 text-center">
+              Ver Histórico Completo
+            </Link>
           </div>
         )}
       </section>

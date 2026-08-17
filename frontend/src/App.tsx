@@ -6,6 +6,7 @@ import { materializeFixedEntries } from './fixedEntries';
 import Dashboard from './Dashboard';
 import NewEntry from './NewEntry';
 import Settings from './Settings';
+import HistoryPage from './HistoryPage';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
 function Navigation() {
@@ -46,6 +47,7 @@ function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/new" element={<NewEntry />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/history" element={<HistoryPage />} />
           </Routes>
         </div>
         <Navigation />
