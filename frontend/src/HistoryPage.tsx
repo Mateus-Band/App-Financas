@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './db';
-import { ArrowLeft, Search, Filter } from 'lucide-react';
+import { ArrowLeft, Search, Filter, Trash2, Edit2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import Loader from './components/Loader';
@@ -10,12 +10,18 @@ export default function HistoryPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('All');
   
-  const transactions = useLiveQuery(() => db.transactions.reverse().sortBy('date'));
+  const transactions = useLiveQuery(() => db.transactions.toArray());
+  const debts = useLiveQuery(() => db.debts.toArray());
   const accounts = useLiveQuery(() => db.accounts.toArray());
 
-  if (transactions === undefined || accounts === undefined) return <Loader />;
+  if (transactions === undefined || debts === undefined || accounts === undefined) return <Loader />;
 
-  const filtered = transactions.filter(t => {
+  const allItems = [
+    ...transactions.map(t => ({ ...t, isDebt: false })),
+    ...debts.map(d => ({ ...d, isDebt: true, category: d.type === 'Lent' ? 'Empréstimo (Dei)' : d.type === 'Borrowed' ? 'Empréstimo (Peguei)' : d.type === 'Received' ? 'Recebimento' : 'Pagamento de Dívida', type: (d.type === 'Lent' || d.type === 'Paid') ? 'Expense' : 'Income' }))
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const filtered = allItems.filter(t => {
     if (typeFilter !== 'All' && t.type !== typeFilter) return false;
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
@@ -28,6 +34,23 @@ export default function HistoryPage() {
 
   const formatBRL = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+  };
+
+  const handleDelete = async (id: number, isDebt: boolean, isInstallment?: boolean, groupId?: string) => {
+    if (isInstallment && groupId) {
+      const option = confirm('Deseja apagar APENAS esta parcela (OK) ou TODAS as parcelas deste grupo (Cancelar)?');
+      if (option) {
+        await db.transactions.delete(id);
+      } else {
+        const toDelete = await db.transactions.where({ installmentGroupId: groupId }).primaryKeys();
+        await db.transactions.bulkDelete(toDelete as number[]);
+      }
+    } else {
+      if (confirm('Tem certeza que deseja apagar este lançamento?')) {
+        if (isDebt) await db.debts.delete(id);
+        else await db.transactions.delete(id);
+      }
+    }
   };
 
   return (
@@ -74,15 +97,29 @@ export default function HistoryPage() {
                 <p className="font-semibold text-sm">{t.description}</p>
                 <p className="text-xs text-secondary mt-1">
                   {format(new Date(t.date), 'dd/MM/yyyy')} • {accounts.find(a => a.id === t.accountId)?.name}
-                  {t.isInstallment && ` (${t.currentInstallment}/${t.installmentCount})`}
+                  {(t as any).isInstallment && ` (${(t as any).currentInstallment}/${(t as any).installmentCount})`}
                 </p>
                 <p className="text-xs bg-[var(--surface-hover)] px-2 py-0.5 rounded inline-block mt-2">
                   {t.category}
                 </p>
               </div>
-              <span className={`font-semibold ${t.type === 'Income' ? 'text-green' : 'text-red'}`}>
-                {t.type === 'Income' ? '+' : '-'}{formatBRL(t.amount)}
-              </span>
+              <div className="flex items-center gap-4">
+                <span className={`font-semibold ${t.type === 'Income' ? 'text-green' : 'text-red'}`}>
+                  {t.type === 'Income' ? '+' : '-'}{formatBRL(t.amount)}
+                </span>
+                <Link
+                  to={`/new?edit=${t.id}&isDebt=${t.isDebt}`}
+                  className="p-2 text-blue-500 hover:bg-blue-500/10 rounded-full"
+                >
+                  <Edit2 size={16} />
+                </Link>
+                <button 
+                  onClick={() => handleDelete(t.id!, t.isDebt, (t as any).isInstallment, (t as any).installmentGroupId)}
+                  className="p-2 text-red hover:bg-red-500/10 rounded-full"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
             </div>
           ))
         )}
