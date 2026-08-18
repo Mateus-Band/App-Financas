@@ -161,6 +161,38 @@ export const syncWithDrive = async (accessToken: string) => {
           if (localDate >= remoteDate) {
             mergedMap.set(localRow.id, localRow);
           }
+        }
+      }
+
+      if (tableName === 'transactions') {
+        const rowsToKeep = new Map<string, any>();
+        
+        for (const row of mergedMap.values()) {
+          if (row.sourceFixedEntryId && row.date) {
+            const key = `${row.sourceFixedEntryId}-${row.date.slice(0, 7)}`;
+            const existing = rowsToKeep.get(key);
+            
+            if (!existing) {
+              rowsToKeep.set(key, row);
+            } else {
+              // Compare updatedAt and id
+              const existingDate = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
+              const currentRowDate = row.updatedAt ? new Date(row.updatedAt).getTime() : 0;
+              
+              if (currentRowDate > existingDate || (currentRowDate === existingDate && row.id < existing.id)) {
+                // Remove the loser from dexie database and mergedMap
+                mergedMap.delete(existing.id);
+                await table.delete(existing.id);
+                rowsToKeep.set(key, row);
+              } else {
+                mergedMap.delete(row.id);
+                await table.delete(row.id);
+              }
+            }
+          }
+        }
+      }
+
       // Bulk put merged rows
       await table.bulkPut(Array.from(mergedMap.values()));
     }
