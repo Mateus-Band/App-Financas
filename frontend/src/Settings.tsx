@@ -91,10 +91,17 @@ export default function Settings() {
     if (!googleToken) return;
     setSyncStatus('Sincronizando...');
     try {
-      await uploadBackup(googleToken);
+      await syncWithDrive(googleToken);
       setSyncStatus('Sincronizado na Nuvem');
-    } catch (e) {
-      setSyncStatus('Erro ao sincronizar');
+    } catch (e: any) {
+      console.error("Erro no handleManualSync:", e);
+      // Se for erro de autenticação (token expirado), deslogar
+      if (e?.status === 401 || e?.result?.error?.code === 401 || (e?.message || '').includes('401')) {
+        logout();
+        alert("Sessão do Google expirada. Por favor, conecte-se novamente.");
+      } else {
+        setSyncStatus('Erro ao sincronizar');
+      }
     }
   };
 
