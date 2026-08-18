@@ -1,8 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './db';
-import { useGoogleLogin } from '@react-oauth/google';
-import { initGoogleDriveApi, uploadBackup, syncWithDrive, triggerAutoSync } from './GoogleSync';
+import { triggerAutoSync } from './GoogleSync';
 import { materializeFixedEntries } from './fixedEntries';
 import { Trash2, Plus, Download, Upload, Settings as SettingsIcon } from 'lucide-react';
 import { format } from 'date-fns';
@@ -13,9 +12,6 @@ export default function Settings() {
   const accounts = useLiveQuery(() => db.accounts.toArray());
   const fixedEntries = useLiveQuery(() => db.fixedEntries.toArray());
   
-  // -- Sync State --
-  const [googleToken, setGoogleToken] = useState<string | null>(localStorage.getItem('gdrive_token'));
-  const [syncStatus, setSyncStatus] = useState(googleToken ? 'Conectado. Sincronizando...' : 'Desconectado');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // -- Forms State --
@@ -47,69 +43,9 @@ export default function Settings() {
     setToastType(type);
   };
 
-  useEffect(() => {
-    initGoogleDriveApi().then(() => {
-      console.log('GAPI inicializado');
-    }).catch(e => console.error(e));
-  }, []);
-
-  // --- GOOGLE SYNC LOGIC ---
-  const login = useGoogleLogin({
-    scope: 'https://www.googleapis.com/auth/drive.appdata',
-    onSuccess: async (tokenResponse) => {
-      const token = tokenResponse.access_token;
-      localStorage.setItem('gdrive_token', token);
-      setGoogleToken(token);
-      setSyncStatus('Buscando backup na nuvem...');
-      try {
-        await syncWithDrive(token);
-        setSyncStatus('Restaurado com sucesso!');
-        setTimeout(() => window.location.reload(), 1500);
-      } catch (err) {
-        console.log("Sem backup anterior ou erro:", err);
-        setSyncStatus('Nenhum backup encontrado. Criando um novo...');
-        try {
-          await uploadBackup(token);
-          setSyncStatus('Sincronizado na Nuvem');
-        } catch (e) {
-          setSyncStatus('Erro ao sincronizar');
-        }
-      }
-    },
-    onError: () => {
-      setSyncStatus('Erro no Login');
-      alert('Login falhou');
-    }
-  });
-
   if (accounts === undefined || fixedEntries === undefined) {
     return <Loader />;
   }
-
-
-  const handleManualSync = async () => {
-    if (!googleToken) return;
-    setSyncStatus('Sincronizando...');
-    try {
-      await syncWithDrive(googleToken);
-      setSyncStatus('Sincronizado na Nuvem');
-    } catch (e: any) {
-      console.error("Erro no handleManualSync:", e);
-      // Se for erro de autenticação (token expirado), deslogar
-      if (e?.status === 401 || e?.result?.error?.code === 401 || (e?.message || '').includes('401')) {
-        logout();
-        alert("Sessão do Google expirada. Por favor, conecte-se novamente.");
-      } else {
-        setSyncStatus('Erro ao sincronizar');
-      }
-    }
-  };
-
-  const logout = () => {
-    localStorage.removeItem('gdrive_token');
-    setGoogleToken(null);
-    setSyncStatus('Desconectado');
-  };
 
   // --- MANUAL BACKUP LOGIC ---
   const handleExport = async () => {
@@ -222,24 +158,17 @@ export default function Settings() {
 
       {/* Cloud Sync */}
       <section className="mb-8 p-4 rounded-xl border border-[var(--border-color)] bg-[var(--surface-color)] flex flex-col gap-3">
-        <div className="flex justify-between items-center">
-          <div>
-            <h3 className="font-semibold text-sm">Sincronização em Nuvem</h3>
-            <p className="text-xs text-secondary">{syncStatus}</p>
-          </div>
-          {googleToken ? (
-            <button onClick={logout} className="text-xs text-red hover:underline">Sair</button>
-          ) : null}
+        <h3 className="font-semibold text-sm border-b border-[var(--border-color)] pb-2">Exportar Backup Local</h3>
+        <p className="text-xs text-secondary">Baixe um arquivo ou restaure. (O Backup em Nuvem agora é automático no topo da tela!)</p>
+        <div className="flex flex-col gap-2">
+          <button onClick={handleExport} className="btn btn-primary w-full flex items-center justify-center gap-2">
+            <Download size={18} /> Exportar Backup
+          </button>
+          <input type="file" accept=".json" ref={fileInputRef} style={{ display: 'none' }} onChange={handleImport} />
+          <button onClick={() => fileInputRef.current?.click()} className="btn btn-outline w-full flex items-center justify-center gap-2">
+            <Upload size={18} /> Importar Backup
+          </button>
         </div>
-        {!googleToken ? (
-          <button onClick={() => login()} className="btn btn-outline w-full text-sm py-2">
-            Conectar com Google Drive
-          </button>
-        ) : (
-          <button onClick={handleManualSync} className="btn btn-primary w-full text-sm py-2">
-            Forçar Sincronização Agora
-          </button>
-        )}
       </section>
 
       {/* Theme Selection */}
