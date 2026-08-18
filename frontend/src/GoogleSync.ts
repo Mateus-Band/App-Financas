@@ -3,23 +3,6 @@ import { db } from './db';
 
 const FILE_NAME = 'finance_backup.json';
 
-export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error' | 'offline';
-let currentSyncStatus: SyncStatus = localStorage.getItem('gdrive_token') ? 'synced' : 'offline';
-type SyncListener = (status: SyncStatus) => void;
-const syncListeners = new Set<SyncListener>();
-
-export const onSyncStatusChange = (listener: SyncListener) => {
-  syncListeners.add(listener);
-  // Emit current immediately
-  listener(currentSyncStatus);
-  return () => syncListeners.delete(listener);
-};
-
-export const setGlobalSyncStatus = (status: SyncStatus) => {
-  currentSyncStatus = status;
-  syncListeners.forEach(l => l(status));
-};
-
 // Initialize the GAPI client for Drive
 export const initGoogleDriveApi = async () => {
   return new Promise<void>((resolve, reject) => {
@@ -227,20 +210,7 @@ export const triggerAutoSync = () => {
     const token = localStorage.getItem('gdrive_token');
     if (token) {
       console.log('Auto-syncing to Google Drive...');
-      setGlobalSyncStatus('syncing');
-      syncWithDrive(token)
-        .then(() => setGlobalSyncStatus('synced'))
-        .catch(e => {
-          console.error('Auto sync error:', e);
-          if (e?.status === 401 || e?.result?.error?.code === 401 || (e?.message || '').includes('401')) {
-            localStorage.removeItem('gdrive_token');
-            setGlobalSyncStatus('offline');
-          } else {
-            setGlobalSyncStatus('error');
-          }
-        });
-    } else {
-      setGlobalSyncStatus('offline');
+      syncWithDrive(token).catch(e => console.error('Auto sync error:', e));
     }
   }, 10000); // 10 seconds debounce
 };
