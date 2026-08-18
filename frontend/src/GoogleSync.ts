@@ -161,9 +161,6 @@ export const syncWithDrive = async (accessToken: string) => {
           if (localDate >= remoteDate) {
             mergedMap.set(localRow.id, localRow);
           }
-        }
-      }
-
       // Bulk put merged rows
       await table.bulkPut(Array.from(mergedMap.values()));
     }
@@ -180,7 +177,7 @@ export const triggerAutoSync = () => {
   syncTimeout = setTimeout(() => {
     const token = localStorage.getItem('gdrive_token');
     if (token) {
-      console.log('Auto-syncing to Google Drive (merging)...');
+      console.log('Auto-syncing to Google Drive...');
       syncWithDrive(token).catch(e => console.error('Auto sync error:', e));
     }
   }, 10000); // 10 seconds debounce
