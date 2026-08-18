@@ -133,10 +133,10 @@ export default function Dashboard() {
       {categoryBreakdown.length > 0 && (
         <section className="mb-8 card">
           <h2 className="text-lg font-bold mb-4 border-b border-[var(--border-color)] pb-2">Gastos por Categoria</h2>
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-4">
             {categoryBreakdown.map(cat => (
-              <div key={cat.category}>
-                <div className="flex justify-between text-sm mb-1">
+              <div key={cat.category} className="border border-[var(--border-color)] p-3 rounded-lg">
+                <div className="flex justify-between text-sm mb-2">
                   <span>{cat.category}</span>
                   <span className="font-semibold">{formatBRL(cat.amount)} ({cat.percentage.toFixed(1)}%)</span>
                 </div>
@@ -155,22 +155,24 @@ export default function Dashboard() {
         {accounts.filter(a => faturasByAccount[a.name] > 0).length === 0 ? (
           <p className="text-sm text-secondary">Nenhuma fatura para este mês.</p>
         ) : (
-          accounts.filter(a => faturasByAccount[a.name] > 0).map(acc => (
-            <div key={acc.id} className="flex justify-between items-center mb-2 last:mb-0 border border-[var(--border-color)] p-3 rounded-lg">
-              <div>
-                <span className="text-secondary block text-sm">{acc.name}</span>
-                <span className="text-red font-semibold">{formatBRL(faturasByAccount[acc.name])}</span>
+          <div className="flex flex-col gap-3">
+            {accounts.filter(a => faturasByAccount[a.name] > 0).map(acc => (
+              <div key={acc.id} className="flex justify-between items-center border border-[var(--border-color)] p-3 rounded-lg">
+                <div>
+                  <span className="text-secondary block text-sm">{acc.name}</span>
+                  <span className="text-red font-semibold">{formatBRL(faturasByAccount[acc.name])}</span>
+                </div>
+                {!isFutureMonth && (
+                  <button 
+                    onClick={() => handlePayInvoice(acc.id!, acc.name, faturasByAccount[acc.name])}
+                    className="btn btn-outline text-xs px-2 py-1 border-green text-green hover:bg-green-500/10"
+                  >
+                    Pagar Fatura
+                  </button>
+                )}
               </div>
-              {!isFutureMonth && (
-                <button 
-                  onClick={() => handlePayInvoice(acc.id!, acc.name, faturasByAccount[acc.name])}
-                  className="btn btn-outline text-xs px-2 py-1 border-green text-green hover:bg-green-500/10"
-                >
-                  Pagar Fatura
-                </button>
-              )}
-            </div>
-          ))
+            ))}
+          </div>
         )}
       </section>
 
@@ -181,16 +183,18 @@ export default function Dashboard() {
         {debtSummaries.length === 0 ? (
           <p className="text-sm text-secondary">Nenhuma dívida pendente.</p>
         ) : (
-          debtSummaries.map(([person, amount]) => (
-            <div key={person} className="flex justify-between mb-2 last:mb-0">
-              <span className="text-secondary">{person}</span>
-              {amount > 0 ? (
-                <span className="text-green font-semibold text-sm bg-green-500/10 px-2 py-1 rounded">Deve-me {formatBRL(amount)}</span>
-              ) : (
-                <span className="text-red font-semibold text-sm bg-red-500/10 px-2 py-1 rounded">Devo-lhe {formatBRL(Math.abs(amount))}</span>
-              )}
-            </div>
-          ))
+          <div className="flex flex-col gap-3">
+            {debtSummaries.map(([person, amount]) => (
+              <div key={person} className="flex justify-between items-center border border-[var(--border-color)] p-3 rounded-lg">
+                <span className="text-secondary">{person}</span>
+                {amount > 0 ? (
+                  <span className="text-green font-semibold text-sm bg-green-500/10 px-2 py-1 rounded">Deve-me {formatBRL(amount)}</span>
+                ) : (
+                  <span className="text-red font-semibold text-sm bg-red-500/10 px-2 py-1 rounded">Devo-lhe {formatBRL(Math.abs(amount))}</span>
+                )}
+              </div>
+            ))}
+          </div>
         )}
       </section>
 

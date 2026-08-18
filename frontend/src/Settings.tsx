@@ -1,7 +1,8 @@
-import { useState, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './db';
-import { triggerAutoSync } from './GoogleSync';
+import { useGoogleLogin } from '@react-oauth/google';
+import { initGoogleDriveApi, uploadBackup, syncWithDrive, triggerAutoSync } from './GoogleSync';
 import { materializeFixedEntries } from './fixedEntries';
 import { Trash2, Plus, Download, Upload, Settings as SettingsIcon } from 'lucide-react';
 import { format } from 'date-fns';
@@ -12,6 +13,9 @@ export default function Settings() {
   const accounts = useLiveQuery(() => db.accounts.toArray());
   const fixedEntries = useLiveQuery(() => db.fixedEntries.toArray());
   
+  // -- Sync State --
+  const [googleToken, setGoogleToken] = useState<string | null>(localStorage.getItem('gdrive_token'));
+  const [syncStatus, setSyncStatus] = useState(googleToken ? 'Conectado. Sincronizando...' : 'Desconectado');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // -- Forms State --
@@ -43,9 +47,69 @@ export default function Settings() {
     setToastType(type);
   };
 
+  useEffect(() => {
+    initGoogleDriveApi().then(() => {
+      console.log('GAPI inicializado');
+    }).catch(e => console.error(e));
+  }, []);
+
+  // --- GOOGLE SYNC LOGIC ---
+  const login = useGoogleLogin({
+    scope: 'https://www.googleapis.com/auth/drive.appdata',
+    onSuccess: async (tokenResponse) => {
+      const token = tokenResponse.access_token;
+      localStorage.setItem('gdrive_token', token);
+      setGoogleToken(token);
+      setSyncStatus('Buscando backup na nuvem...');
+      try {
+        await syncWithDrive(token);
+        setSyncStatus('Restaurado com sucesso!');
+        setTimeout(() => window.location.reload(), 1500);
+      } catch (err) {
+        console.log("Sem backup anterior ou erro:", err);
+        setSyncStatus('Nenhum backup encontrado. Criando um novo...');
+        try {
+          await uploadBackup(token);
+          setSyncStatus('Sincronizado na Nuvem');
+        } catch (e) {
+          setSyncStatus('Erro ao sincronizar');
+        }
+      }
+    },
+    onError: () => {
+      setSyncStatus('Erro no Login');
+      alert('Login falhou');
+    }
+  });
+
   if (accounts === undefined || fixedEntries === undefined) {
     return <Loader />;
   }
+
+
+  const handleManualSync = async () => {
+    if (!googleToken) return;
+    setSyncStatus('Sincronizando...');
+    try {
+      await syncWithDrive(googleToken);
+      setSyncStatus('Sincronizado na Nuvem');
+    } catch (e: any) {
+      console.error("Erro no handleManualSync:", e);
+      // Se for erro de autenticação (token expirado), deslogar
+      if (e?.status === 401 || e?.result?.error?.code === 401 || (e?.message || '').includes('401')) {
+        logout();
+        alert("Sessão do Google expirada. Por favor, conecte-se novamente.");
+      } else {
+        setSyncStatus('Erro ao sincronizar');
+      }
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem('gdrive_token');
+    setGoogleToken(null);
+    setSyncStatus('Desconectado');
+  };
 
   // --- MANUAL BACKUP LOGIC ---
   const handleExport = async () => {
@@ -158,43 +222,51 @@ export default function Settings() {
 
       {/* Cloud Sync */}
       <section className="mb-8 p-4 rounded-xl border border-[var(--border-color)] bg-[var(--surface-color)] flex flex-col gap-3">
-        <h3 className="font-semibold text-sm border-b border-[var(--border-color)] pb-2">Exportar Backup Local</h3>
-        <p className="text-xs text-secondary">Baixe um arquivo ou restaure. (O Backup em Nuvem agora é automático no topo da tela!)</p>
-        <div className="flex flex-col gap-2">
-          <button onClick={handleExport} className="btn btn-primary w-full flex items-center justify-center gap-2">
-            <Download size={18} /> Exportar Backup
-          </button>
-          <input type="file" accept=".json" ref={fileInputRef} style={{ display: 'none' }} onChange={handleImport} />
-          <button onClick={() => fileInputRef.current?.click()} className="btn btn-outline w-full flex items-center justify-center gap-2">
-            <Upload size={18} /> Importar Backup
-          </button>
+        <div className="flex items-center gap-3 border-b border-[var(--border-color)] pb-3">
+          <div className="p-2 bg-[var(--primary-color)] rounded-full text-white bg-opacity-20">
+            {googleToken ? <Upload size={20} className="text-[var(--primary-color)]" /> : <Download size={20} className="text-[var(--primary-color)]" />}
+          </div>
+          <div className="flex-1">
+            <h3 className="font-semibold text-sm">Sincronização em Nuvem</h3>
+            <p className="text-xs text-secondary mt-1">{syncStatus}</p>
+          </div>
+          {googleToken ? (
+            <button onClick={logout} className="text-xs text-red hover:bg-red-500/10 px-2 py-1 rounded transition-colors">Sair</button>
+          ) : null}
+        </div>
+        <div className="pt-1">
+          {!googleToken ? (
+            <button onClick={() => login()} className="btn btn-primary w-full text-sm py-2">
+              Conectar com Google Drive
+            </button>
+          ) : (
+            <button onClick={handleManualSync} className="btn btn-outline w-full text-sm py-2">
+              Forçar Sincronização Agora
+            </button>
+          )}
         </div>
       </section>
 
       {/* Theme Selection */}
       <section className="mb-8 p-4 rounded-xl border border-[var(--border-color)] bg-[var(--surface-color)] flex flex-col gap-3">
         <h3 className="font-semibold text-sm border-b border-[var(--border-color)] pb-2">Tema do App</h3>
-        <div className="flex flex-col gap-2">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="radio" name="theme" checked={theme === 'purple'} onChange={() => handleThemeChange('purple')} />
-            <span style={{ color: '#8b5cf6' }} className="font-semibold">Roxo Escuro (Padrão)</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="radio" name="theme" checked={theme === 'red'} onChange={() => handleThemeChange('red')} />
-            <span style={{ color: '#f65c5c' }} className="font-semibold">Vermelho Escuro</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="radio" name="theme" checked={theme === 'blue'} onChange={() => handleThemeChange('blue')} />
-            <span style={{ color: '#5c8bf6' }} className="font-semibold">Azul Escuro</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="radio" name="theme" checked={theme === 'green'} onChange={() => handleThemeChange('green')} />
-            <span style={{ color: '#5cf65c' }} className="font-semibold">Verde Escuro</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="radio" name="theme" checked={theme === 'mono'} onChange={() => handleThemeChange('mono')} />
-            <span style={{ color: '#d4d4d4' }} className="font-semibold">Preto e Branco</span>
-          </label>
+        <div className="flex justify-between items-center mt-2 px-2">
+          {[
+            { id: 'purple', color: '#8b5cf6', label: 'Roxo' },
+            { id: 'red', color: '#f65c5c', label: 'Vermelho' },
+            { id: 'blue', color: '#5c8bf6', label: 'Azul' },
+            { id: 'green', color: '#5cf65c', label: 'Verde' },
+            { id: 'mono', color: '#d4d4d4', label: 'Mono' }
+          ].map(t => (
+            <button
+              key={t.id}
+              onClick={() => handleThemeChange(t.id)}
+              style={{ backgroundColor: t.color }}
+              title={t.label}
+              className={`w-8 h-8 rounded-full border-2 transition-all ${theme === t.id ? 'border-white scale-110 shadow-lg' : 'border-transparent opacity-60 hover:opacity-100 hover:scale-105'}`}
+              aria-label={`Tema ${t.label}`}
+            />
+          ))}
         </div>
       </section>
 

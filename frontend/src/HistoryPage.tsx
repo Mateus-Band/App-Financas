@@ -105,7 +105,7 @@ export default function HistoryPage() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-4">
         {filtered.length === 0 ? (
           <p className="text-secondary text-center py-8">Nenhum lançamento encontrado.</p>
         ) : (
