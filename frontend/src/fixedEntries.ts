@@ -75,4 +75,6 @@ export async function materializeFixedEntries() {
   if (transactionsToAdd.length > 0) {
     await db.transactions.bulkAdd(transactionsToAdd);
   }
+  
+  return transactionsToAdd.length;
 }

@@ -3,6 +3,7 @@ import { HashRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Home, PlusCircle, Settings as SettingsIcon } from 'lucide-react';
 import { seedDatabase } from './seed';
 import { materializeFixedEntries } from './fixedEntries';
+import { triggerAutoSync } from './GoogleSync';
 import Dashboard from './Dashboard';
 import NewEntry from './NewEntry';
 import Settings from './Settings';
@@ -33,7 +34,9 @@ function Navigation() {
 function App() {
   useEffect(() => {
     seedDatabase().then(() => {
-      materializeFixedEntries().catch(e => console.error('Erro ao materializar fixos:', e));
+      materializeFixedEntries().then(count => {
+        if (count > 0) triggerAutoSync();
+      }).catch(e => console.error('Erro ao materializar fixos:', e));
     });
     
     const savedTheme = localStorage.getItem('finance-theme') || 'purple';
